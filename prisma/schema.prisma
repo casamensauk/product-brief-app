@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum BriefStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+  SCOPED
+}
+
+model ProjectBrief {
+  id               String   @id @default(uuid())
+  clientName       String
+  projectName      String?
+  contactEmail     String?
+  shareToken       String   @unique
+  status           BriefStatus @default(DRAFT)
+  
+  purposeData      Json?    // JTBD, Before/After states, Business Drivers, Anti-Goals
+  featureMatrix    Json?    // { name, description, priority }
+  techRequirements Json?    // Hosting preferences, DB needs, Third-party APIs
+  userRoles        Json?    // Authentication needs and roles
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
