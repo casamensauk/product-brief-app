@@ -2,56 +2,36 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
+import { Loader2 } from "lucide-react"
 
 export default function DeveloperBriefEditor({ brief }: { brief: any }) {
   const [data, setData] = useState(brief)
-  const [isSaving, setIsSaving] = useState(false)
-  
-  const [stakeholdersStr, setStakeholdersStr] = useState(JSON.stringify(brief.stakeholders || [], null, 2))
-  const [gatheringStr, setGatheringStr] = useState(JSON.stringify(brief.gatheringMethods || {}, null, 2))
-  const [reqsStr, setReqsStr] = useState(JSON.stringify(brief.categorisedRequirements || [], null, 2))
-  const [analysisStr, setAnalysisStr] = useState(JSON.stringify(brief.analysisModels || {}, null, 2))
-  const [docsStr, setDocsStr] = useState(JSON.stringify(brief.documentationData || {}, null, 2))
+  const [isGenerating, setIsGenerating] = useState(false)
 
-  const handleSave = async () => {
-    setIsSaving(true)
+  const handleGenerate = async () => {
+    setIsGenerating(true)
     try {
-      const payload = {
-        ...data,
-        stakeholders: JSON.parse(stakeholdersStr),
-        gatheringMethods: JSON.parse(gatheringStr),
-        categorisedRequirements: JSON.parse(reqsStr),
-        analysisModels: JSON.parse(analysisStr),
-        documentationData: JSON.parse(docsStr)
+      const res = await fetch(`/api/briefs/${data.shareToken}/generate`, { method: "POST" })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || "Failed to generate")
       }
-      await fetch(`/api/briefs/${brief.shareToken}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      })
-      alert("Saved successfully")
-    } catch (e) {
-      alert("Error saving: invalid JSON")
+      const updated = await res.json()
+      setData(updated)
+      alert("Requirements generated successfully!")
+    } catch (e: any) {
+      alert("Error generating: " + e.message)
     }
-    setIsSaving(false)
+    setIsGenerating(false)
   }
 
   const exportToMarkdown = () => {
-    let stk: any[] = []; let gath: any = {}; let reqs: any[] = []; 
-    let ana: any = {}; let doc: any = {};
-    
-    try {
-      stk = JSON.parse(stakeholdersStr);
-      gath = JSON.parse(gatheringStr);
-      reqs = JSON.parse(reqsStr);
-      ana = JSON.parse(analysisStr);
-      doc = JSON.parse(docsStr);
-    } catch (e) {
-      alert("Please fix JSON before exporting")
-      return
-    }
+    const stk = data.stakeholders || [];
+    const gath = data.gatheringMethods || {};
+    const reqs = data.categorisedRequirements || [];
+    const ana = data.analysisModels || {};
+    const doc = data.documentationData || {};
 
     const md = `# Requirements Analysis Document (RAD)
 
@@ -96,13 +76,15 @@ ${reqs.map((r: any) => `- **[${r.category || "Uncategorised"}]** ${r.name || "N/
     URL.revokeObjectURL(url)
   }
 
+  const hasGeneratedData = data.stakeholders || data.categorisedRequirements?.length > 0;
+  const raw = data.rawClientAnswers || {};
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Editing RAD for: {data.clientName}</h2>
+        <h2 className="text-2xl font-bold">Editing Brief: {data.clientName}</h2>
         <div className="space-x-2 flex">
-          <Button variant="outline" onClick={exportToMarkdown}>Export Markdown</Button>
-          <Button onClick={handleSave} disabled={isSaving}>{isSaving ? "Saving..." : "Save Changes"}</Button>
+          <Button variant="outline" onClick={exportToMarkdown}>Export to Markdown</Button>
         </div>
       </div>
       
@@ -113,7 +95,15 @@ ${reqs.map((r: any) => `- **[${r.category || "Uncategorised"}]** ${r.name || "N/
         <CardContent className="space-y-4">
           <Select 
             value={data.status} 
-            onValueChange={val => setData({...data, status: val})}
+            onValueChange={async (val) => {
+              setData({...data, status: val})
+              // Optimistically update status
+              await fetch(`/api/briefs/${data.shareToken}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: val })
+              })
+            }}
           >
             <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
@@ -126,11 +116,99 @@ ${reqs.map((r: any) => `- **[${r.category || "Uncategorised"}]** ${r.name || "N/
         </CardContent>
       </Card>
       
-      <Card><CardHeader><CardTitle>1. Stakeholders (JSON)</CardTitle></CardHeader><CardContent><Textarea className="font-mono h-40" value={stakeholdersStr} onChange={e => setStakeholdersStr(e.target.value)} /></CardContent></Card>
-      <Card><CardHeader><CardTitle>2. Gathering Methods (JSON)</CardTitle></CardHeader><CardContent><Textarea className="font-mono h-40" value={gatheringStr} onChange={e => setGatheringStr(e.target.value)} /></CardContent></Card>
-      <Card><CardHeader><CardTitle>3. Categorised Requirements (JSON)</CardTitle></CardHeader><CardContent><Textarea className="font-mono h-40" value={reqsStr} onChange={e => setReqsStr(e.target.value)} /></CardContent></Card>
-      <Card><CardHeader><CardTitle>4. Analysis Models (JSON)</CardTitle></CardHeader><CardContent><Textarea className="font-mono h-40" value={analysisStr} onChange={e => setAnalysisStr(e.target.value)} /></CardContent></Card>
-      <Card><CardHeader><CardTitle>5. Documentation Data (JSON)</CardTitle></CardHeader><CardContent><Textarea className="font-mono h-40" value={docsStr} onChange={e => setDocsStr(e.target.value)} /></CardContent></Card>
+      <Card className="bg-slate-50">
+        <CardHeader>
+          <CardTitle>Raw Client Questionnaire Answers</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          <div><strong>About Company:</strong> <p className="text-muted-foreground whitespace-pre-wrap">{raw.aboutCompany || "Not answered"}</p></div>
+          <div><strong>Primary Problem:</strong> <p className="text-muted-foreground whitespace-pre-wrap">{raw.primaryProblem || "Not answered"}</p></div>
+          <div><strong>Target Users:</strong> <p className="text-muted-foreground whitespace-pre-wrap">{raw.targetUsers || "Not answered"}</p></div>
+          <div><strong>Must Have Features:</strong> <p className="text-muted-foreground whitespace-pre-wrap">{raw.mustHaveFeatures || "Not answered"}</p></div>
+          <div><strong>Design Inspiration:</strong> <p className="text-muted-foreground whitespace-pre-wrap">{raw.designInspiration || "Not answered"}</p></div>
+          <div><strong>Logistics (Timeline/Budget):</strong> <p className="text-muted-foreground whitespace-pre-wrap">{raw.logistics || "Not answered"}</p></div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-center py-4">
+        <Button size="lg" onClick={handleGenerate} disabled={isGenerating} className="w-full max-w-md gap-2">
+          {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : "✨"}
+          {isGenerating ? "Generating Requirements with AI..." : "✨ Generate Formal Requirements with AI"}
+        </Button>
+      </div>
+
+      {hasGeneratedData && (
+        <div className="space-y-6">
+          <h3 className="text-xl font-bold border-b pb-2">AI Generated Requirements Analysis (RAD)</h3>
+          
+          <Card>
+            <CardHeader><CardTitle>1. Stakeholders</CardTitle></CardHeader>
+            <CardContent>
+              <ul className="list-disc pl-5">
+                {data.stakeholders?.map((s: any, i: number) => (
+                  <li key={i}><strong>{s.name}</strong> ({s.role}) - {s.influence}</li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>2. Gathering Methods & Stories</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-4 text-sm">
+                <span>Interviews: {data.gatheringMethods?.interviews ? "✅" : "❌"}</span>
+                <span>Surveys: {data.gatheringMethods?.surveys ? "✅" : "❌"}</span>
+              </div>
+              <div>
+                <strong>User Stories</strong>
+                <p className="whitespace-pre-wrap text-sm text-muted-foreground">{data.gatheringMethods?.userStories}</p>
+              </div>
+              <div>
+                <strong>Use Cases</strong>
+                <p className="whitespace-pre-wrap text-sm text-muted-foreground">{data.gatheringMethods?.useCases}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>3. Categorised Requirements</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {data.categorisedRequirements?.map((r: any, i: number) => (
+                  <div key={i} className="border p-3 rounded-md">
+                    <div className="flex justify-between">
+                      <span className="font-semibold">{r.name}</span>
+                      <span className="text-xs bg-slate-100 px-2 py-1 rounded">{r.category} | {r.priority}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">{r.description}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>4. Analysis Models</CardTitle></CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div><strong>Context Diagram:</strong> <a href={data.analysisModels?.contextDiagramUrl} className="text-blue-500 underline">{data.analysisModels?.contextDiagramUrl || "None"}</a></div>
+              <div><p className="text-muted-foreground">{data.analysisModels?.contextDiagramNotes}</p></div>
+              <div className="mt-4"><strong>Prototype:</strong> <a href={data.analysisModels?.prototypeUrl} className="text-blue-500 underline">{data.analysisModels?.prototypeUrl || "None"}</a></div>
+              <div><p className="text-muted-foreground">{data.analysisModels?.prototypeNotes}</p></div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>5. Documentation</CardTitle></CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div><strong>Purpose:</strong> {data.documentationData?.purpose}</div>
+              <div><strong>Audience:</strong> {data.documentationData?.audience}</div>
+              <div><strong>Timeline:</strong> {data.documentationData?.timeline}</div>
+              <div><strong>Budget:</strong> {data.documentationData?.budget}</div>
+              <div><strong>Success Metrics:</strong> {data.documentationData?.successMetrics}</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

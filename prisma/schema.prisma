@@ -27,6 +27,8 @@ model ProjectBrief {
   analysisModels          Json?
   documentationData       Json?
   
+  rawClientAnswers        Json?
+  
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
