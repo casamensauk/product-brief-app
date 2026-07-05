@@ -8,58 +8,41 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import debounce from "lodash/debounce"
 
 const formSchema = z.object({
-  contextData: z.object({
-    companyName: z.string().optional(),
-    primaryContact: z.string().optional(),
-    projectName: z.string().optional(),
-    primaryGoal: z.string().optional(),
-    projectType: z.string().optional()
-  }).optional(),
-  purposeData: z.object({
-    problemStatement: z.string().optional(),
-    targetAudience: z.string().optional(),
-    valueProp: z.string().optional(),
-    inclusiveDesign: z.string().optional(),
-    jtbd: z.string().optional(),
-    beforeAfter: z.string().optional(),
-    businessDrivers: z.string().optional(),
-    antiGoals: z.string().optional(),
-    magicMoment: z.string().optional(),
-  }).optional(),
-  userRoles: z.object({
-    requiresAuth: z.boolean().optional(),
-    authMethods: z.array(z.string()).optional(),
-    rolesDescription: z.string().optional()
-  }).optional(),
-  featureMatrix: z.array(z.object({
-    name: z.string().min(1, "Feature name is required"),
-    description: z.string().optional(),
-    priority: z.string().optional()
+  stakeholders: z.array(z.object({
+    name: z.string().min(1, "Name is required"),
+    role: z.string().optional(),
+    influence: z.string().optional()
   })).optional(),
-  techRequirements: z.object({
-    hosting: z.string().optional(),
-    database: z.string().optional(),
-    aiIntegrations: z.string().optional(),
-    requiresMonetization: z.boolean().optional(),
-    monetizationModel: z.string().optional(),
-    thirdParty: z.string().optional()
+  gatheringMethods: z.object({
+    interviews: z.boolean().optional(),
+    focusGroups: z.boolean().optional(),
+    surveys: z.boolean().optional(),
+    documentObservations: z.boolean().optional(),
+    userStories: z.string().optional(),
+    useCases: z.string().optional()
   }).optional(),
-  designData: z.object({
-    brandGuidelines: z.string().optional(),
-    uiUxVibe: z.string().optional(),
-    mobileResponsiveness: z.string().optional()
+  categorisedRequirements: z.array(z.object({
+    name: z.string().min(1, "Requirement name is required"),
+    category: z.string().optional(), // Functional, Non-functional, Technical, Operational, Transitional
+    priority: z.string().optional(),
+    description: z.string().optional()
+  })).optional(),
+  analysisModels: z.object({
+    contextDiagramUrl: z.string().optional(),
+    contextDiagramNotes: z.string().optional(),
+    prototypeUrl: z.string().optional(),
+    prototypeNotes: z.string().optional()
   }).optional(),
-  logisticsData: z.object({
-    compliance: z.string().optional(),
-    launchDate: z.string().optional(),
-    deadlineType: z.string().optional(),
-    budget: z.string().optional(),
-    successMetrics: z.string().optional()
+  documentationData: z.object({
+    purpose: z.string().optional(),
+    audience: z.string().optional(),
+    successMetrics: z.string().optional(),
+    timeline: z.string().optional(),
+    budget: z.string().optional()
   }).optional(),
 })
 
@@ -72,19 +55,22 @@ export default function ClientForm({ initialData, token }: { initialData: any, t
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      contextData: initialData?.contextData || {},
-      purposeData: initialData?.purposeData || {},
-      userRoles: initialData?.userRoles || { authMethods: [] },
-      featureMatrix: initialData?.featureMatrix || [],
-      techRequirements: initialData?.techRequirements || {},
-      designData: initialData?.designData || {},
-      logisticsData: initialData?.logisticsData || {}
+      stakeholders: initialData?.stakeholders || [],
+      gatheringMethods: initialData?.gatheringMethods || {},
+      categorisedRequirements: initialData?.categorisedRequirements || [],
+      analysisModels: initialData?.analysisModels || {},
+      documentationData: initialData?.documentationData || {}
     }
   })
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields: stakeholderFields, append: appendStakeholder, remove: removeStakeholder } = useFieldArray({
     control: form.control,
-    name: "featureMatrix"
+    name: "stakeholders"
+  })
+
+  const { fields: reqFields, append: appendReq, remove: removeReq } = useFieldArray({
+    control: form.control,
+    name: "categorisedRequirements"
   })
 
   const saveToDb = async (data: FormData) => {
@@ -112,306 +98,207 @@ export default function ClientForm({ initialData, token }: { initialData: any, t
     return () => subscription.unsubscribe()
   }, [form.watch, debouncedSave])
 
-  const nextStep = () => setStep(s => Math.min(s + 1, 7))
+  const nextStep = () => setStep(s => Math.min(s + 1, 5))
   const prevStep = () => setStep(s => Math.max(s - 1, 1))
 
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-6">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">Project Requirements Gathering</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Requirements Analysis</h1>
         <span className="text-sm text-muted-foreground">
-          {isSaving ? "Saving..." : "Saved"} | Step {step} of 7
+          {isSaving ? "Saving..." : "Saved"} | Step {step} of 5
         </span>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>
-            {step === 1 && "1. Client & Project Context"}
-            {step === 2 && "2. Core Purpose & Target Audience"}
-            {step === 3 && "3. User Roles & Permissions"}
-            {step === 4 && "4. Functional Requirements & Feature Matrix"}
-            {step === 5 && "5. Infrastructure, Tech Stack & Integrations"}
-            {step === 6 && "6. Design & Branding"}
-            {step === 7 && "7. Logistics, Compliance & Delivery"}
+            {step === 1 && "1. Identify Key Stakeholders"}
+            {step === 2 && "2. Requirements Gathering"}
+            {step === 3 && "3. Categorise & Prioritise Requirements"}
+            {step === 4 && "4. Requirements Analysis & Modelling"}
+            {step === 5 && "5. Requirements Documentation"}
           </CardTitle>
           <CardDescription>
-            {step === 1 && "Capturing basic administrative and high-level project details."}
-            {step === 2 && "Understanding the 'why' and ensuring the application acts as an effective, low-friction tool."}
-            {step === 3 && "Defining who has access to what."}
-            {step === 4 && "Detailing exactly what the application needs to do."}
-            {step === 5 && "Gathering technical prerequisites."}
-            {step === 6 && "Ensuring visual and interactive elements align with your identity."}
-            {step === 7 && "Establishing timelines, budgets, and legal constraints."}
+            {step === 1 && "Identify all business owners, investors, analysts, sponsors, managers, and end-users."}
+            {step === 2 && "Detail the methods used to gather requirements and specify the use cases/user stories."}
+            {step === 3 && "Categorise into Functional, Non-functional, Technical, Operational, and Transitional."}
+            {step === 4 && "Provide context diagrams and prototypes to visually align with business needs."}
+            {step === 5 && "Finalise the agreement, including purpose, audience, budget, and metrics."}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-6">
             {step === 1 && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Company/Organization Name</Label>
-                  <Input {...form.register("contextData.companyName")} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Primary Contact Name & Role</Label>
-                  <Input {...form.register("contextData.primaryContact")} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Project Name</Label>
-                  <Input {...form.register("contextData.projectName")} />
-                </div>
-                <div className="space-y-2">
-                  <Label>What is the primary goal of this web application?</Label>
-                  <Textarea {...form.register("contextData.primaryGoal")} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Is this a greenfield project or a rebuild?</Label>
-                  <RadioGroup 
-                    onValueChange={(val) => form.setValue("contextData.projectType", val)}
-                    defaultValue={form.getValues("contextData.projectType")}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="Greenfield" id="greenfield" />
-                      <Label htmlFor="greenfield">Greenfield (built from scratch)</Label>
+              <div className="space-y-6">
+                <p className="text-sm text-muted-foreground mb-4">Add stakeholders who have a say in the software project.</p>
+                {stakeholderFields.map((field, index) => (
+                  <div key={field.id} className="flex gap-4 items-start border p-4 rounded-md">
+                    <div className="flex-1 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Name</Label>
+                          <Input {...form.register(`stakeholders.${index}.name` as const)} placeholder="e.g. Jane Doe" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Role</Label>
+                          <Input {...form.register(`stakeholders.${index}.role` as const)} placeholder="e.g. Product Owner" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Influence / Interest</Label>
+                        <Input {...form.register(`stakeholders.${index}.influence` as const)} placeholder="e.g. Final Approver" />
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="Rebuild" id="rebuild" />
-                      <Label htmlFor="rebuild">Rebuild/migration of an existing platform</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="Integration" id="integration" />
-                      <Label htmlFor="integration">Integration with existing app</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
+                    <Button type="button" variant="destructive" onClick={() => removeStakeholder(index)}>Remove</Button>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" onClick={() => appendStakeholder({ name: "", role: "", influence: "" })}>
+                  Add Stakeholder
+                </Button>
               </div>
             )}
 
             {step === 2 && (
               <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label>Problem Statement</Label>
-                  <p className="text-xs text-muted-foreground">What specific friction or pain point does this solve?</p>
-                  <Textarea {...form.register("purposeData.problemStatement")} />
+                <div className="space-y-4">
+                  <Label>Requirements Gathering Techniques Used</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox id="interviews" checked={form.watch("gatheringMethods.interviews")} onCheckedChange={(c) => form.setValue("gatheringMethods.interviews", c as boolean)} />
+                      <Label htmlFor="interviews">Interviews</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox id="focusGroups" checked={form.watch("gatheringMethods.focusGroups")} onCheckedChange={(c) => form.setValue("gatheringMethods.focusGroups", c as boolean)} />
+                      <Label htmlFor="focusGroups">Focus Groups</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox id="surveys" checked={form.watch("gatheringMethods.surveys")} onCheckedChange={(c) => form.setValue("gatheringMethods.surveys", c as boolean)} />
+                      <Label htmlFor="surveys">Surveys / Questionnaires</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox id="docs" checked={form.watch("gatheringMethods.documentObservations")} onCheckedChange={(c) => form.setValue("gatheringMethods.documentObservations", c as boolean)} />
+                      <Label htmlFor="docs">Document Observations</Label>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Target Audience</Label>
-                  <p className="text-xs text-muted-foreground">Who are the primary users? (Demographics, technical proficiency, expected device usage)</p>
-                  <Textarea {...form.register("purposeData.targetAudience")} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Value Proposition</Label>
-                  <p className="text-xs text-muted-foreground">How does this app streamline users' daily workflows or routines?</p>
-                  <Textarea {...form.register("purposeData.valueProp")} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Inclusive Design Requirements</Label>
-                  <Textarea {...form.register("purposeData.inclusiveDesign")} placeholder="e.g. WCAG 2.1 AA..." />
-                </div>
+                
                 <hr />
+
                 <div className="space-y-2">
-                  <Label>The "Job to be Done" (JTBD)</Label>
-                  <p className="text-xs text-muted-foreground">When a user opens this app, what specific task are they "hiring" it to do?</p>
-                  <Textarea {...form.register("purposeData.jtbd")} />
+                  <Label>User Stories</Label>
+                  <p className="text-xs text-muted-foreground">Focus on user needs, expectations, and goals.</p>
+                  <Textarea {...form.register("gatheringMethods.userStories")} className="min-h-[100px]" placeholder="As a [user type], I want to [action] so that [benefit]..." />
                 </div>
+                
                 <div className="space-y-2">
-                  <Label>The "Before & After" State</Label>
-                  <p className="text-xs text-muted-foreground">Before: Describe current friction. After: What does the ideal workflow look like?</p>
-                  <Textarea {...form.register("purposeData.beforeAfter")} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Core Business Drivers</Label>
-                  <p className="text-xs text-muted-foreground">Why is your business investing in this now?</p>
-                  <Textarea {...form.register("purposeData.businessDrivers")} />
-                </div>
-                <div className="space-y-2">
-                  <Label>The "Anti-Goals" (Out of Scope)</Label>
-                  <p className="text-xs text-muted-foreground">What should this application explicitly never do?</p>
-                  <Textarea {...form.register("purposeData.antiGoals")} />
-                </div>
-                <div className="space-y-2">
-                  <Label>The "Magic" Moment</Label>
-                  <p className="text-xs text-muted-foreground">What is the specific interaction or result that will make the user realize its value instantly?</p>
-                  <Textarea {...form.register("purposeData.magicMoment")} />
+                  <Label>Use Cases</Label>
+                  <p className="text-xs text-muted-foreground">Determine system behaviour from the end user's perspective.</p>
+                  <Textarea {...form.register("gatheringMethods.useCases")} className="min-h-[100px]" placeholder="Use Case 1: User logs in..." />
                 </div>
               </div>
             )}
 
             {step === 3 && (
               <div className="space-y-6">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="reqAuth" 
-                    checked={form.watch("userRoles.requiresAuth")}
-                    onCheckedChange={(c) => form.setValue("userRoles.requiresAuth", c as boolean)}
-                  />
-                  <Label htmlFor="reqAuth">Will the application require user authentication?</Label>
-                </div>
-                
-                {form.watch("userRoles.requiresAuth") && (
-                  <div className="space-y-4 pl-6">
-                    <Label>Preferred authentication methods:</Label>
-                    <div className="space-y-2">
-                      {["Email / Password", "Social Logins (Google, Apple, GitHub)", "Enterprise SSO (SAML, OAuth)", "Passwordless (Magic Links / OTP)"].map((method) => (
-                        <div className="flex items-center space-x-2" key={method}>
-                          <Checkbox 
-                            id={`auth-${method}`}
-                            checked={form.watch("userRoles.authMethods")?.includes(method)}
-                            onCheckedChange={(checked) => {
-                              const current = form.getValues("userRoles.authMethods") || []
-                              if (checked) {
-                                form.setValue("userRoles.authMethods", [...current, method])
-                              } else {
-                                form.setValue("userRoles.authMethods", current.filter(m => m !== method))
-                              }
-                            }}
-                          />
-                          <Label htmlFor={`auth-${method}`}>{method}</Label>
+                <p className="text-sm text-muted-foreground mb-4">List requirements and categorise them (Functional, Non-functional, Technical, Operational, Transitional).</p>
+                {reqFields.map((field, index) => (
+                  <div key={field.id} className="flex gap-4 items-start border p-4 rounded-md">
+                    <div className="flex-1 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Requirement Name</Label>
+                          <Input {...form.register(`categorisedRequirements.${index}.name` as const)} placeholder="e.g. SSO Login" />
                         </div>
-                      ))}
+                        <div className="space-y-2">
+                          <Label>Category</Label>
+                          <select 
+                            {...form.register(`categorisedRequirements.${index}.category` as const)}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <option value="">Select a category...</option>
+                            <option value="Functional">Functional (System Behavior)</option>
+                            <option value="Non-functional">Non-functional (Performance/Attributes)</option>
+                            <option value="Technical">Technical (Development Issues)</option>
+                            <option value="Operational">Operational (Backend/Running)</option>
+                            <option value="Transitional">Transitional (Implementation)</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Description & Details</Label>
+                        <Textarea {...form.register(`categorisedRequirements.${index}.description` as const)} placeholder="Describe the requirement in detail..." />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Priority</Label>
+                        <Input {...form.register(`categorisedRequirements.${index}.priority` as const)} placeholder="Must-have / Should-have / Nice-to-have" />
+                      </div>
                     </div>
+                    <Button type="button" variant="destructive" onClick={() => removeReq(index)}>Remove</Button>
                   </div>
-                )}
-                
-                <div className="space-y-2">
-                  <Label>Define distinct user roles & permissions</Label>
-                  <p className="text-xs text-muted-foreground">e.g., Admin, Standard User, Guest</p>
-                  <Textarea {...form.register("userRoles.rolesDescription")} className="h-40" />
-                </div>
+                ))}
+                <Button type="button" variant="outline" onClick={() => appendReq({ name: "", category: "", description: "", priority: "" })}>
+                  Add Requirement
+                </Button>
               </div>
             )}
 
             {step === 4 && (
               <div className="space-y-6">
-                <p className="text-sm text-muted-foreground mb-4">Please list the core features and categorize their priority (Must-have, Should-have, Nice-to-have).</p>
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex gap-4 items-start border p-4 rounded-md">
-                    <div className="flex-1 space-y-4">
-                      <div className="space-y-2">
-                        <Label>Feature Name</Label>
-                        <Input {...form.register(`featureMatrix.${index}.name`)} placeholder="e.g. User Dashboard" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Description</Label>
-                        <Textarea {...form.register(`featureMatrix.${index}.description`)} placeholder="Aggregated view of daily tasks and analytics." />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Priority</Label>
-                        <Input {...form.register(`featureMatrix.${index}.priority`)} placeholder="Must-have / Should-have / Nice-to-have" />
-                      </div>
-                    </div>
-                    <Button type="button" variant="destructive" onClick={() => remove(index)}>Remove</Button>
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Context Diagram</h3>
+                  <p className="text-sm text-muted-foreground">Show the interfaces and boundaries of the proposed system with the external world.</p>
+                  <div className="space-y-2">
+                    <Label>Diagram URL</Label>
+                    <Input {...form.register("analysisModels.contextDiagramUrl")} placeholder="https://miro.com/..." />
                   </div>
-                ))}
-                <Button type="button" variant="outline" onClick={() => append({ name: "", description: "", priority: "" })}>
-                  Add Feature
-                </Button>
+                  <div className="space-y-2">
+                    <Label>Context Notes</Label>
+                    <Textarea {...form.register("analysisModels.contextDiagramNotes")} placeholder="Notes about the data flow and entities..." />
+                  </div>
+                </div>
+                
+                <hr />
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Prototype / Wireframes</h3>
+                  <p className="text-sm text-muted-foreground">Provide links to testable products to gather feedback from the end-user's perspective.</p>
+                  <div className="space-y-2">
+                    <Label>Prototype URL</Label>
+                    <Input {...form.register("analysisModels.prototypeUrl")} placeholder="https://figma.com/..." />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Prototype Notes</Label>
+                    <Textarea {...form.register("analysisModels.prototypeNotes")} placeholder="Feedback and beta phase notes..." />
+                  </div>
+                </div>
               </div>
             )}
 
             {step === 5 && (
-              <div className="space-y-4">
+              <div className="space-y-6">
+                <p className="text-sm text-muted-foreground mb-4">The final Requirements Analysis Document (RAD) overview.</p>
                 <div className="space-y-2">
-                  <Label>Hosting & Deployment</Label>
-                  <Textarea {...form.register("techRequirements.hosting")} placeholder="Do you have preferred cloud infrastructure?" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Database & Storage</Label>
-                  <Textarea {...form.register("techRequirements.database")} placeholder="Anticipated data storage needs?" />
+                  <Label>Project Purpose</Label>
+                  <Textarea {...form.register("documentationData.purpose")} placeholder="High-level purpose of the project..." />
                 </div>
                 <div className="space-y-2">
-                  <Label>AI Integrations</Label>
-                  <Textarea {...form.register("techRequirements.aiIntegrations")} placeholder="Will the platform require LLM integration?" />
+                  <Label>Audience Overview</Label>
+                  <Textarea {...form.register("documentationData.audience")} placeholder="Who is this project ultimately for?" />
                 </div>
-                <div className="flex items-center space-x-2 mt-6">
-                  <Checkbox 
-                    id="reqMonetize" 
-                    checked={form.watch("techRequirements.requiresMonetization")}
-                    onCheckedChange={(c) => form.setValue("techRequirements.requiresMonetization", c as boolean)}
-                  />
-                  <Label htmlFor="reqMonetize">Does the application require payment processing?</Label>
-                </div>
-                {form.watch("techRequirements.requiresMonetization") && (
-                  <div className="space-y-2 pl-6">
-                    <Label>Please describe the pricing model:</Label>
-                    <Textarea {...form.register("techRequirements.monetizationModel")} placeholder="Subscriptions, one-off..." />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Project Timeline</Label>
+                    <Input {...form.register("documentationData.timeline")} placeholder="e.g. Q3 2026" />
                   </div>
-                )}
-                <div className="space-y-2 mt-4">
-                  <Label>Third-Party APIs</Label>
-                  <Textarea {...form.register("techRequirements.thirdParty")} placeholder="List external services the app must integrate with..." />
-                </div>
-              </div>
-            )}
-
-            {step === 6 && (
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label>Do you have an existing brand guideline?</Label>
-                  <RadioGroup 
-                    onValueChange={(val) => form.setValue("designData.brandGuidelines", val)}
-                    defaultValue={form.getValues("designData.brandGuidelines")}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="Yes" id="brand-yes" />
-                      <Label htmlFor="brand-yes">Yes, ready to upload</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="Partial" id="brand-partial" />
-                      <Label htmlFor="brand-partial">Partial</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="No" id="brand-no" />
-                      <Label htmlFor="brand-no">No, needs creation</Label>
-                    </div>
-                  </RadioGroup>
+                  <div className="space-y-2">
+                    <Label>Project Budget</Label>
+                    <Input {...form.register("documentationData.budget")} placeholder="e.g. $50,000" />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>UI/UX Vibe</Label>
-                  <p className="text-xs text-muted-foreground">How should the application feel to the user?</p>
-                  <Textarea {...form.register("designData.uiUxVibe")} placeholder="Corporate & structured, playful & energetic..." />
-                </div>
-                <div className="space-y-2">
-                  <Label>Mobile Responsiveness</Label>
-                  <p className="text-xs text-muted-foreground">Strictly web-based or PWA native feel?</p>
-                  <Textarea {...form.register("designData.mobileResponsiveness")} />
-                </div>
-              </div>
-            )}
-
-            {step === 7 && (
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label>Regulatory compliance requirements</Label>
-                  <Textarea {...form.register("logisticsData.compliance")} placeholder="GDPR, HIPAA, financial data..." />
-                </div>
-                <div className="space-y-2">
-                  <Label>Target Launch Date</Label>
-                  <Input type="date" {...form.register("logisticsData.launchDate")} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Is this a hard deadline or soft target?</Label>
-                  <Textarea {...form.register("logisticsData.deadlineType")} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Project Budget Range</Label>
-                  <select 
-                    {...form.register("logisticsData.budget")}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="">Select a range...</option>
-                    <option value="<$10k">Under $10,000</option>
-                    <option value="$10k-$25k">$10,000 - $25,000</option>
-                    <option value="$25k-$50k">$25,000 - $50,000</option>
-                    <option value="$50k-$100k">$50,000 - $100,000</option>
-                    <option value=">$100k">Over $100,000</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Success Metrics</Label>
-                  <p className="text-xs text-muted-foreground">How will you measure success 6 months post-launch?</p>
-                  <Textarea {...form.register("logisticsData.successMetrics")} />
+                  <Label>Testing & Success Metrics</Label>
+                  <Textarea {...form.register("documentationData.successMetrics")} placeholder="Methods to test the solution and measure success..." />
                 </div>
               </div>
             )}
@@ -419,11 +306,11 @@ export default function ClientForm({ initialData, token }: { initialData: any, t
         </CardContent>
         <CardFooter className="flex justify-between">
           <Button variant="outline" type="button" onClick={prevStep} disabled={step === 1}>Previous</Button>
-          {step < 7 ? (
+          {step < 5 ? (
             <Button type="button" onClick={nextStep}>Next</Button>
           ) : (
             <Button type="button" onClick={() => saveToDb(form.getValues()).then(() => alert("Submitted successfully!"))}>
-              Submit
+              Submit & Finalise RAD
             </Button>
           )}
         </CardFooter>

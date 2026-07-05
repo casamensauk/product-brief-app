@@ -21,13 +21,11 @@ model ProjectBrief {
   shareToken       String   @unique
   status           BriefStatus @default(DRAFT)
   
-  contextData      Json?
-  purposeData      Json?
-  featureMatrix    Json?
-  techRequirements Json?
-  userRoles        Json?
-  designData       Json?
-  logisticsData    Json?
+  stakeholders            Json?
+  gatheringMethods        Json?
+  categorisedRequirements Json?
+  analysisModels          Json?
+  documentationData       Json?
   
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
