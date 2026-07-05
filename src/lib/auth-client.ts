@@ -1,5 +1,4 @@
 import { createAuthClient } from "better-auth/react"
 
-export const authClient = createAuthClient({
-    baseURL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
-})
+// Auth is served by this app at /api/auth, so no baseURL is needed.
+export const authClient = createAuthClient()
