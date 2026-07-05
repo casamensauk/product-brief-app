@@ -1,9 +1,14 @@
 import { questionsSchema, type Answers, type Question } from "@/lib/schemas"
+import { DEFAULT_QUESTIONS } from "@/lib/templates"
 
-/** Parse the questions column of a brief, tolerating legacy/empty values. */
+/**
+ * Parse the questions column of a brief. Briefs created before questionnaires
+ * became editable have no questions stored — they fall back to the default
+ * template, whose ids match the answer keys of the old hardcoded form.
+ */
 export function parseQuestions(raw: unknown): Question[] {
   const result = questionsSchema.safeParse(raw)
-  return result.success ? result.data : []
+  return result.success ? result.data : DEFAULT_QUESTIONS
 }
 
 /**

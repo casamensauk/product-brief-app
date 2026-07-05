@@ -103,6 +103,8 @@ export function ClientQuestionnaire({
   }
 
   const handleSubmit = async () => {
+    // A trailing autosave would 409 after submission; drop it.
+    if (saveTimer.current) clearTimeout(saveTimer.current)
     setSubmitting(true)
     try {
       const res = await fetch(`/api/briefs/${token}/submit`, {
