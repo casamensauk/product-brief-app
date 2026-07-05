@@ -94,15 +94,7 @@
   --color-outline-variant: #c6c6cd;
 
   /* Discovery Pro Spacing */
-  --spacing-base: 4px;
-  --spacing-gutter: 24px;
-  --spacing-md: 16px;
-  --spacing-xxl: 64px;
-  --spacing-sm: 8px;
-  --spacing-lg: 24px;
-  --spacing-xl: 40px;
   --spacing-container-max: 1200px;
-  --spacing-xs: 4px;
 
   /* Discovery Pro Typography */
   --font-headline-lg: "Plus Jakarta Sans", sans-serif;

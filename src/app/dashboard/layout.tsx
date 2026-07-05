@@ -7,11 +7,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <ProtectedRoute>
       {/* TopNavBar */}
       <header className="bg-surface-container-lowest dark:bg-primary-container docked full-width top-0 z-40 border-b border-surface-variant dark:border-outline-variant">
-        <div className="flex justify-between items-center w-full px-lg py-sm max-w-container-max mx-auto h-16">
+        <div className="flex justify-between items-center w-full px-6 py-2 max-w-container-max mx-auto h-16">
           <div className="flex items-center gap-4">
             <span className="font-headline-md text-headline-md font-bold text-on-surface dark:text-on-primary">Discovery Pro</span>
           </div>
-          <div className="flex items-center gap-md">
+          <div className="flex items-center gap-4">
             <button className="text-secondary dark:text-secondary-fixed-dim hover:text-secondary transition-colors p-2 rounded-full hover:bg-surface-container-high">
               <span className="material-symbols-outlined">notifications</span>
             </button>
@@ -31,7 +31,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <div className="flex flex-1 overflow-hidden">
         {/* SideNavBar */}
-        <aside className="hidden md:flex flex-col bg-surface dark:bg-primary-container h-full w-64 border-r border-surface-variant dark:border-outline-variant p-md space-y-2 sticky top-16">
+        <aside className="hidden md:flex flex-col bg-surface dark:bg-primary-container h-full w-64 border-r border-surface-variant dark:border-outline-variant p-4 space-y-2 sticky top-16">
           <div className="flex items-center gap-3 px-2 py-4 mb-4">
             <div className="w-10 h-10 rounded-lg bg-secondary-container flex items-center justify-center">
               <span className="material-symbols-outlined text-on-secondary-container" style={{ fontVariationSettings: "'FILL' 1" }}>business</span>
@@ -55,7 +55,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="font-label-md text-label-md">Settings</span>
             </Link>
           </nav>
-          <div className="mt-auto pt-md">
+          <div className="mt-auto pt-4">
             <button className="w-full bg-secondary hover:bg-secondary-container text-on-secondary hover:text-on-secondary-container font-label-md text-label-md py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
               <span className="material-symbols-outlined text-[20px]">add</span>
               Add Requirement
@@ -64,13 +64,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </aside>
 
         {/* Main Content Canvas */}
-        <main className="flex-1 overflow-y-auto custom-scrollbar bg-background p-md lg:p-xl pb-24 lg:pb-xl">
+        <main className="flex-1 overflow-y-auto custom-scrollbar bg-background p-4 lg:p-10 pb-24 lg:pb-10">
           {children}
         </main>
       </div>
 
       {/* Mobile Bottom NavBar */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full flex justify-between items-center px-lg py-md bg-white dark:bg-primary-container z-50 shadow-sm border-t border-surface-variant dark:border-outline-variant">
+      <nav className="md:hidden fixed bottom-0 left-0 w-full flex justify-between items-center px-6 py-4 bg-white dark:bg-primary-container z-50 shadow-sm border-t border-surface-variant dark:border-outline-variant">
         <button className="flex flex-col items-center justify-center text-on-surface-variant px-4 py-2 hover:bg-surface-container-high transition-transform active:scale-98">
           <span className="material-symbols-outlined">folder_open</span>
           <span className="font-label-sm text-label-sm mt-1">Projects</span>
