@@ -1,7 +1,10 @@
 "use client"
 import { useEffect, useState } from "react"
 import Link from "next/link"
-
+import { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter, DialogClose } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
 const getStatusStyle = (status: string) => {
   switch (status) {
     case 'DRAFT':
@@ -20,6 +23,11 @@ const getStatusStyle = (status: string) => {
 export default function DashboardPage() {
   const [briefs, setBriefs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  
+  const [isOpen, setIsOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+  const [clientName, setClientName] = useState("")
+  const [projectName, setProjectName] = useState("")
 
   useEffect(() => {
     fetch('/api/briefs')
@@ -30,6 +38,28 @@ export default function DashboardPage() {
       })
   }, [])
 
+  const handleCreateBrief = async () => {
+    setIsCreating(true)
+    try {
+      const res = await fetch('/api/briefs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientName, projectName })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        window.location.href = `/dashboard/brief/${data.shareToken}`
+      } else {
+        alert("Failed to create discovery session")
+        setIsCreating(false)
+      }
+    } catch (e) {
+      console.error(e)
+      alert("Failed to create discovery session")
+      setIsCreating(false)
+    }
+  }
+
   return (
     <div className="max-w-container-max mx-auto space-y-10">
       {/* Dashboard Header */}
@@ -38,10 +68,38 @@ export default function DashboardPage() {
           <h1 className="font-headline-lg text-headline-lg text-on-surface">Dashboard</h1>
           <p className="text-body-md text-on-surface-variant mt-1">Monitor and manage your client discovery sessions.</p>
         </div>
-        <Link href="/" className="flex items-center gap-2 bg-secondary text-on-secondary px-6 py-3 rounded-xl hover:bg-secondary-container hover:text-on-secondary-container transition-all shadow-sm active:scale-95">
-          <span className="material-symbols-outlined">rocket_launch</span>
-          <span className="font-label-md text-label-md">Start New Discovery</span>
-        </Link>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+          <DialogTrigger className="flex items-center gap-2 bg-secondary text-on-secondary px-6 py-3 rounded-xl hover:bg-secondary-container hover:text-on-secondary-container transition-all shadow-sm active:scale-95 cursor-pointer">
+            <span className="material-symbols-outlined">rocket_launch</span>
+            <span className="font-label-md text-label-md">Start New Discovery</span>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>New Discovery Session</DialogTitle>
+              <DialogDescription>
+                Enter the basic details to start a new discovery session.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="clientName">Client Name</Label>
+                <Input id="clientName" value={clientName} onChange={e => setClientName(e.target.value)} placeholder="e.g. Acme Corp" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="projectName">Project Name</Label>
+                <Input id="projectName" value={projectName} onChange={e => setProjectName(e.target.value)} placeholder="e.g. Website Redesign" />
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+                Cancel
+              </DialogClose>
+              <Button onClick={handleCreateBrief} disabled={!clientName || isCreating}>
+                {isCreating ? "Creating..." : "Start Discovery"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
