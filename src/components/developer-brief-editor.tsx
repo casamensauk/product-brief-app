@@ -34,7 +34,7 @@ export default function DeveloperBriefEditor({ brief }: { brief: any }) {
   }
 
   const exportToMarkdown = () => {
-    let purp = {}; let feat = []; let tech = {};
+    let purp: any = {}; let feat: any[] = []; let tech: any = {};
     try {
       purp = JSON.parse(purposeStr);
       feat = JSON.parse(featureStr);
