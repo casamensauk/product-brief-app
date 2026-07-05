@@ -1,110 +1,97 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { requireSession } from "@/lib/session"
+import { jsonError, notFound, unauthorized } from "@/lib/api"
+import { AIError, completeJson } from "@/lib/ai"
+import { answersSchema, productBriefSchema } from "@/lib/schemas"
+import { parseQuestions } from "@/lib/answers"
+
+export const maxDuration = 120
+
+const SYSTEM_PROMPT = `You are an expert business analyst and product strategist at a software agency.
+You turn raw client discovery answers into rigorous, actionable product briefs.
+You always respond with a single valid JSON object and nothing else.
+Never invent facts: where the client did not provide information, say so explicitly (e.g. "Not specified — clarify with client") or list it under openQuestions.`
 
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  
+  if (!(await requireSession(req))) return unauthorized()
+  const { token } = await params
+
+  const brief = await prisma.projectBrief.findUnique({ where: { shareToken: token } })
+  if (!brief) return notFound()
+
+  const questions = parseQuestions(brief.questions)
+  const answersResult = answersSchema.safeParse(brief.rawClientAnswers)
+  const answers = answersResult.success ? answersResult.data : {}
+
+  const answered = questions
+    .map((q) => {
+      const value = answers[q.id]
+      const text = Array.isArray(value) ? value.join(", ") : value?.trim()
+      return text ? `Q: ${q.label}\nA: ${text}` : null
+    })
+    .filter(Boolean)
+
+  if (answered.length === 0) {
+    return jsonError("The client has not answered the questionnaire yet.", 400)
+  }
+
+  const prompt = `Create a complete product brief from this client discovery questionnaire.
+
+Project metadata:
+- Client: ${brief.clientName}
+- Project: ${brief.projectName || "(not specified)"}
+
+Questionnaire answers:
+${answered.join("\n\n")}
+
+Instructions:
+- Base everything strictly on the answers above. Flag gaps rather than inventing details.
+- requirements: extract every explicit or clearly implied requirement, categorised (Functional | Non-functional | Technical | Operational | Transitional) and prioritised with MoSCoW (Must-have | Should-have | Nice-to-have).
+- userStories: written as "As a <user>, I want <capability>, so that <benefit>".
+- scope.outOfScope: things adjacent to the request that are explicitly or implicitly excluded from a first version.
+- risks: real delivery risks for this specific project, each with a mitigation.
+- openQuestions: concrete questions the agency should ask the client next.
+- executiveSummary: 3-5 sentences a stakeholder could read in isolation.
+
+Return JSON in exactly this shape:
+{
+  "executiveSummary": "string",
+  "problemStatement": "string",
+  "goals": ["string"],
+  "targetUsers": [{ "persona": "string", "description": "string" }],
+  "stakeholders": [{ "name": "string", "role": "string", "interest": "string" }],
+  "userStories": ["string"],
+  "requirements": [{ "name": "string", "description": "string", "category": "Functional|Non-functional|Technical|Operational|Transitional", "priority": "Must-have|Should-have|Nice-to-have" }],
+  "scope": { "inScope": ["string"], "outOfScope": ["string"] },
+  "assumptions": ["string"],
+  "risks": [{ "risk": "string", "mitigation": "string" }],
+  "openQuestions": ["string"],
+  "timeline": "string",
+  "budget": "string",
+  "successMetrics": ["string"]
+}`
+
   try {
-    const brief = await prisma.projectBrief.findUnique({
-      where: { shareToken: token }
-    })
-
-    if (!brief) {
-      return NextResponse.json({ error: "Brief not found" }, { status: 404 })
+    const raw = await completeJson({ system: SYSTEM_PROMPT, prompt })
+    const parsed = productBriefSchema.safeParse(raw)
+    if (!parsed.success) {
+      console.error("Generated brief failed validation:", parsed.error.issues[0])
+      return jsonError("The AI returned an unusable brief. Please try again.", 502)
     }
 
-    if (!brief.rawClientAnswers) {
-      return NextResponse.json({ error: "No raw client answers found to generate from." }, { status: 400 })
-    }
-
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: "OPENROUTER_API_KEY is not configured on the server." }, { status: 500 })
-    }
-
-    const prompt = `You are an expert Business Analyst. 
-    Analyze the following raw client answers from a software project discovery questionnaire and generate a formal Requirements Analysis Document following the Pulsion 5-step methodology. 
-    
-    Return ONLY a valid JSON object matching this exact schema (no markdown formatting, no comments, just raw JSON):
-    {
-      "stakeholders": [
-        { "name": "Name or N/A", "role": "Role or N/A", "influence": "Influence/Interest" }
-      ],
-      "gatheringMethods": {
-        "interviews": true/false,
-        "focusGroups": true/false,
-        "surveys": true/false,
-        "documentObservations": true/false,
-        "userStories": "Markdown string of user stories inferred from the answers",
-        "useCases": "Markdown string of use cases inferred from the answers"
-      },
-      "categorisedRequirements": [
-        { "name": "Feature name", "category": "Functional|Non-functional|Technical|Operational|Transitional", "description": "Details", "priority": "Must-have|Should-have|Nice-to-have" }
-      ],
-      "analysisModels": {
-        "contextDiagramUrl": "Any URL mentioned for diagrams, or empty",
-        "contextDiagramNotes": "Inferred notes about system context",
-        "prototypeUrl": "Any URL mentioned for prototypes/wireframes, or empty",
-        "prototypeNotes": "Notes about design/wireframes mentioned"
-      },
-      "documentationData": {
-        "purpose": "High-level purpose",
-        "audience": "Audience overview",
-        "successMetrics": "Inferred success metrics",
-        "timeline": "Timeline mentioned",
-        "budget": "Budget mentioned"
-      }
-    }
-
-    Client Answers:
-    ${JSON.stringify(brief.rawClientAnswers, null, 2)}
-    `
-
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "HTTP-Referer": "https://product-brief-app.railway.app", 
-        "X-Title": "Product Brief App",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "anthropic/claude-3.5-sonnet",
-        messages: [
-          { role: "system", content: "You are an expert Business Analyst system that strictly outputs valid JSON." },
-          { role: "user", content: prompt }
-        ],
-        response_format: { type: "json_object" }
-      })
-    })
-
-    if (!response.ok) {
-      const errTxt = await response.text()
-      throw new Error(`OpenRouter API error: ${response.status} ${errTxt}`)
-    }
-
-    const data = await response.json()
-    const content = data.choices[0].message.content
-
-    // Attempt to parse the JSON (Claude might wrap it in markdown code blocks even when told not to, so we sanitize)
-    const jsonStr = content.replace(/^```json/, "").replace(/```$/, "").trim()
-    const parsed = JSON.parse(jsonStr)
-
-    // Update the database
-    const updatedBrief = await prisma.projectBrief.update({
+    const updated = await prisma.projectBrief.update({
       where: { shareToken: token },
       data: {
-        stakeholders: parsed.stakeholders,
-        gatheringMethods: parsed.gatheringMethods,
-        categorisedRequirements: parsed.categorisedRequirements,
-        analysisModels: parsed.analysisModels,
-        documentationData: parsed.documentationData
-      }
+        generatedBrief: parsed.data,
+        // Move the workflow forward, but never regress a later status.
+        ...(brief.status === "SUBMITTED" && { status: "REVIEWED" as const }),
+      },
     })
-
-    return NextResponse.json(updatedBrief)
-  } catch (error: any) {
-    console.error("Failed to generate requirements:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(updated)
+  } catch (err) {
+    if (err instanceof AIError) return jsonError(err.message, err.status)
+    console.error("generate failed:", err)
+    return jsonError("Failed to generate the brief. Please try again.", 500)
   }
 }

@@ -1,40 +1,83 @@
-import Link from "next/link";
-import { ArrowRight, LayoutDashboard, FileText } from "lucide-react";
+import Link from "next/link"
+import { ArrowRight, FileText, ListChecks, Send, Sparkles } from "lucide-react"
+import { getSession } from "@/lib/session"
 
-export default function Home() {
+export default async function Home() {
+  const session = await getSession()
+
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950 font-sans">
-      <main className="flex flex-1 w-full max-w-5xl mx-auto flex-col items-center justify-center py-24 px-8 text-center">
-        <div className="mb-8 p-4 bg-blue-100 dark:bg-blue-900/30 rounded-full inline-block">
-          <FileText className="w-12 h-12 text-blue-600 dark:text-blue-400" />
-        </div>
-        
-        <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-6">
-          Product Brief <span className="text-blue-600 dark:text-blue-500">Generator</span>
+    <div className="flex min-h-screen flex-col">
+      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5">
+        <span className="flex items-center gap-2 font-heading text-lg font-bold">
+          <FileText className="size-5 text-primary" />
+          Discovery Pro
+        </span>
+        <Link
+          href={session ? "/dashboard" : "/login"}
+          className="text-sm font-medium text-primary hover:underline"
+        >
+          {session ? "Open dashboard" : "Sign in"}
+        </Link>
+      </header>
+
+      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-6 py-20 text-center">
+        <h1 className="max-w-3xl font-heading text-4xl font-bold tracking-tight text-balance md:text-6xl">
+          From client questionnaire to{" "}
+          <span className="text-primary">product brief</span>, without the
+          back-and-forth
         </h1>
-        
-        <p className="max-w-2xl text-xl text-slate-600 dark:text-slate-400 mb-10 leading-relaxed">
-          A seamless way to gather, manage, and export comprehensive software project requirements. 
-          Share frictionless forms with clients and generate standardized product briefs instantly.
+
+        <p className="mt-6 max-w-2xl text-lg text-muted-foreground text-pretty">
+          Build a discovery questionnaire (or let AI draft one), share a single
+          link with your client, and turn their answers into a structured,
+          ready-to-scope product brief.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
-          <Link
-            href="/dashboard"
-            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-medium transition-all shadow-lg hover:shadow-blue-500/25"
-          >
-            <LayoutDashboard className="w-5 h-5" />
-            Developer Dashboard
-          </Link>
-          <Link
-            href="/login"
-            className="flex items-center justify-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-900 dark:text-white px-8 py-4 rounded-xl font-medium transition-all"
-          >
-            Sign In
-            <ArrowRight className="w-5 h-5" />
-          </Link>
+        <Link
+          href={session ? "/dashboard" : "/login"}
+          className="mt-10 inline-flex items-center gap-2 rounded-xl bg-primary px-8 py-4 font-medium text-primary-foreground shadow-lg transition-all hover:bg-primary/90 hover:shadow-primary/25"
+        >
+          {session ? "Go to dashboard" : "Get started"}
+          <ArrowRight className="size-5" />
+        </Link>
+
+        <div className="mt-20 grid w-full gap-6 text-left sm:grid-cols-3">
+          <div className="rounded-xl border bg-card p-6">
+            <ListChecks className="size-6 text-primary" />
+            <h2 className="mt-4 font-heading font-semibold">
+              Tailored questionnaires
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Start from a proven discovery template, edit every question, or
+              have AI draft one for the specific client and project.
+            </p>
+          </div>
+          <div className="rounded-xl border bg-card p-6">
+            <Send className="size-6 text-primary" />
+            <h2 className="mt-4 font-heading font-semibold">
+              One link for clients
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Clients answer step by step with autosave — no accounts, no
+              attachments, no chasing.
+            </p>
+          </div>
+          <div className="rounded-xl border bg-card p-6">
+            <Sparkles className="size-6 text-primary" />
+            <h2 className="mt-4 font-heading font-semibold">
+              AI product briefs
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Answers become a structured brief: requirements, scope, risks,
+              user stories and open questions — exportable as Markdown.
+            </p>
+          </div>
         </div>
       </main>
+
+      <footer className="mx-auto w-full max-w-5xl px-6 py-8 text-center text-sm text-muted-foreground">
+        Discovery Pro
+      </footer>
     </div>
-  );
+  )
 }

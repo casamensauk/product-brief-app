@@ -1,38 +1,60 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
+import { requireSession } from "@/lib/session"
+import { jsonError, notFound, parseBody, unauthorized } from "@/lib/api"
+import { updateBriefSchema } from "@/lib/schemas"
 
-export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  try {
-    const brief = await prisma.projectBrief.findUnique({
-      where: { shareToken: token }
-    });
-    
-    if (!brief) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
-    
-    return NextResponse.json(brief);
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch brief' }, { status: 500 });
-  }
+type Params = { params: Promise<{ token: string }> }
+
+export async function GET(req: Request, { params }: Params) {
+  if (!(await requireSession(req))) return unauthorized()
+  const { token } = await params
+
+  const brief = await prisma.projectBrief.findUnique({ where: { shareToken: token } })
+  if (!brief) return notFound()
+  return NextResponse.json(brief)
 }
 
-export async function PUT(req: Request, { params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  try {
-    const body = await req.json();
-    
-    const brief = await prisma.projectBrief.update({
-      where: { shareToken: token },
-      data: {
-        ...body
-      }
-    });
-    
-    return NextResponse.json(brief);
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: 'Failed to update brief' }, { status: 500 });
+export async function PATCH(req: Request, { params }: Params) {
+  if (!(await requireSession(req))) return unauthorized()
+  const { token } = await params
+
+  const { data, error } = await parseBody(req, updateBriefSchema)
+  if (error) return error
+
+  const existing = await prisma.projectBrief.findUnique({
+    where: { shareToken: token },
+    select: { id: true },
+  })
+  if (!existing) return notFound()
+
+  if (Object.keys(data).length === 0) {
+    return jsonError("No editable fields provided", 400)
   }
+
+  const brief = await prisma.projectBrief.update({
+    where: { shareToken: token },
+    data: {
+      ...(data.clientName !== undefined && { clientName: data.clientName }),
+      ...(data.projectName !== undefined && { projectName: data.projectName || null }),
+      ...(data.contactEmail !== undefined && { contactEmail: data.contactEmail || null }),
+      ...(data.status !== undefined && { status: data.status }),
+      ...(data.questions !== undefined && { questions: data.questions }),
+    },
+  })
+  return NextResponse.json(brief)
+}
+
+export async function DELETE(req: Request, { params }: Params) {
+  if (!(await requireSession(req))) return unauthorized()
+  const { token } = await params
+
+  const existing = await prisma.projectBrief.findUnique({
+    where: { shareToken: token },
+    select: { id: true },
+  })
+  if (!existing) return notFound()
+
+  await prisma.projectBrief.delete({ where: { shareToken: token } })
+  return NextResponse.json({ ok: true })
 }
