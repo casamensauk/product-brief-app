@@ -25,6 +25,7 @@ export function CreateBriefDialog({ trigger }: { trigger?: React.ReactElement })
   const [contactEmail, setContactEmail] = useState("")
 
   const handleCreate = async () => {
+    if (creating) return
     setCreating(true)
     try {
       const res = await fetch("/api/briefs", {

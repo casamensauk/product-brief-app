@@ -42,7 +42,7 @@ export function ResponsesView({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground" suppressHydrationWarning>
         {brief.submittedAt
           ? `Submitted by the client on ${new Date(brief.submittedAt).toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" })}.`
           : `The client has answered ${answered.length} of ${brief.questions.length} questions but hasn't submitted yet.`}

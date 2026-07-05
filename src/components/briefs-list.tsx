@@ -144,7 +144,10 @@ export function BriefsList({ briefs }: { briefs: BriefListItem[] }) {
                         {STATUS_LABELS[brief.status]}
                       </Badge>
                     </td>
-                    <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
+                    <td
+                      className="hidden px-4 py-3 text-muted-foreground md:table-cell"
+                      suppressHydrationWarning
+                    >
                       {new Date(brief.updatedAt).toLocaleDateString(undefined, {
                         day: "numeric",
                         month: "short",

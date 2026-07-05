@@ -44,19 +44,28 @@ export function ClientQuestionnaire({
   const [validationError, setValidationError] = useState<string | null>(null)
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const saveAbort = useRef<AbortController | null>(null)
 
   const save = useCallback(
     async (toSave: Answers) => {
+      // Cancel any in-flight save so a slow older request can't finish after
+      // a newer one and report a stale result.
+      saveAbort.current?.abort()
+      const controller = new AbortController()
+      saveAbort.current = controller
+
       setSaveState("saving")
       try {
         const res = await fetch(`/api/briefs/${token}/answers`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ answers: toSave }),
+          signal: controller.signal,
         })
         if (!res.ok) throw new Error()
         setSaveState("saved")
-      } catch {
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return
         setSaveState("error")
       }
     },
