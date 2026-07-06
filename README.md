@@ -14,7 +14,10 @@ Turn client discovery questionnaires into structured product briefs.
 3. **Generate the product brief.** AI turns the answers into a structured
    brief — executive summary, goals, personas, stakeholders, user stories,
    MoSCoW-prioritised requirements, scope, assumptions, risks, open questions,
-   timeline, budget and success metrics — exportable as Markdown.
+   timeline, budget and success metrics. Generation streams in live,
+   section by section. Every section is then editable by hand or
+   regenerable individually, earlier versions are snapshotted automatically
+   and restorable, and the whole brief exports as Markdown.
 
 ## Stack
 
