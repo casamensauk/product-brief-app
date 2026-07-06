@@ -30,15 +30,22 @@ export function extractDeltaContent(payload: string): string | null {
   }
 }
 
+// Match a key only when it's used as a JSON key (`"key":`), so a section name
+// appearing inside prose (e.g. "budget" mentioned in the executive summary)
+// doesn't tick the checklist early. Precomputed to avoid per-call allocation.
+const SECTION_KEY_PATTERNS = new Map(
+  BRIEF_SECTION_KEYS.map((key) => [key, new RegExp(`"${key}"\\s*:`)])
+)
+
 /**
  * Given the JSON accumulated so far, return the top-level brief section keys
- * that have newly appeared (mutating `seen` to record them). Keys are
- * case-sensitive, so "scope" never matches "inScope"/"outOfScope".
+ * that have newly appeared as JSON keys (mutating `seen` to record them).
+ * Case-sensitive, so "scope" never matches "inScope"/"outOfScope".
  */
 export function detectNewSections(accumulated: string, seen: Set<string>): string[] {
   const found: string[] = []
   for (const key of BRIEF_SECTION_KEYS) {
-    if (!seen.has(key) && accumulated.includes(`"${key}"`)) {
+    if (!seen.has(key) && SECTION_KEY_PATTERNS.get(key)!.test(accumulated)) {
       seen.add(key)
       found.push(key)
     }

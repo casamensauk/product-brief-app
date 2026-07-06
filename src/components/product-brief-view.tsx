@@ -258,7 +258,7 @@ function BriefSectionCard({
 
   const handleSave = async () => {
     setSaving(true)
-    const ok = await onSave(draft)
+    const ok = await onSave(sanitizeDraft(section, draft))
     setSaving(false)
     if (ok) setEditing(false)
   }
@@ -809,6 +809,37 @@ function GenerationProgress({
       </ul>
     </div>
   )
+}
+
+// Drop blank list items / scope entries / fully-empty structured rows that a
+// user leaves behind (e.g. a trailing newline in a one-item-per-line editor)
+// so they don't persist as empty bullets.
+function sanitizeDraft(section: BriefSection, draft: unknown): unknown {
+  const cleanList = (items: unknown) =>
+    (Array.isArray(items) ? items : [])
+      .map((v) => (typeof v === "string" ? v.trim() : v))
+      .filter(Boolean)
+
+  switch (section.kind) {
+    case "stringList":
+      return cleanList(draft)
+    case "scope": {
+      const scope = (draft as ProductBrief["scope"]) ?? { inScope: [], outOfScope: [] }
+      return {
+        inScope: cleanList(scope.inScope),
+        outOfScope: cleanList(scope.outOfScope),
+      }
+    }
+    case "targetUsers":
+    case "stakeholders":
+    case "risks":
+    case "requirements":
+      return (Array.isArray(draft) ? (draft as Record<string, string>[]) : []).filter((row) =>
+        Object.values(row).some((v) => typeof v === "string" && v.trim() !== "")
+      )
+    default:
+      return draft
+  }
 }
 
 function Prose({ text }: { text: string }) {

@@ -52,6 +52,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const content = await streamCompletion({
           system: BRIEF_SYSTEM_PROMPT,
           prompt,
+          // Cancel the upstream request if the client disconnects.
+          signal: req.signal,
           onDelta: (delta) => {
             accumulated += delta
             for (const section of detectNewSections(accumulated, seen)) {

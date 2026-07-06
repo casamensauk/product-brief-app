@@ -111,8 +111,12 @@ export async function streamCompletion(options: {
   system: string
   prompt: string
   onDelta: (text: string) => void
+  /** Cancels the upstream request early (e.g. when the client disconnects). */
+  signal?: AbortSignal
 }): Promise<string> {
   const apiKey = requireApiKey()
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout
 
   let response: Response
   try {
@@ -132,7 +136,7 @@ export async function streamCompletion(options: {
         response_format: { type: "json_object" },
         stream: true,
       }),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal,
     })
   } catch (cause) {
     if (cause instanceof Error && cause.name === "TimeoutError") {
