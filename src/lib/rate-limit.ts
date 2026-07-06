@@ -4,6 +4,21 @@ type Options = { windowMs: number; max: number }
 // (Railway); a multi-instance deployment would need shared storage (Redis).
 const hits = new Map<string, number[]>()
 
+// Periodically drop keys with no recent activity so the map can't grow
+// unbounded from one-off IPs/tokens.
+let lastSweep = Date.now()
+const SWEEP_INTERVAL_MS = 5 * 60_000
+const STALE_MS = 10 * 60_000
+
+function sweepStaleKeys(now: number) {
+  if (now - lastSweep < SWEEP_INTERVAL_MS) return
+  lastSweep = now
+  for (const [key, timestamps] of hits) {
+    const newest = timestamps[timestamps.length - 1]
+    if (newest === undefined || now - newest > STALE_MS) hits.delete(key)
+  }
+}
+
 /**
  * Record one request against `key` and report whether it's within the limit.
  * Sliding window: only requests in the last `windowMs` count.
@@ -13,6 +28,7 @@ export function checkRateLimit(
   { windowMs, max }: Options
 ): { allowed: boolean; retryAfter: number } {
   const now = Date.now()
+  sweepStaleKeys(now)
   const cutoff = now - windowMs
   const recent = (hits.get(key) ?? []).filter((t) => t > cutoff)
 
