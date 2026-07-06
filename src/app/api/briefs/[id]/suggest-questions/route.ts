@@ -33,15 +33,15 @@ const aiResponseSchema = z.object({
 const SYSTEM_PROMPT = `You are an expert product discovery consultant who designs client intake questionnaires for software projects.
 You always respond with a single valid JSON object and nothing else.`
 
-export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await requireSession(req))) return unauthorized()
-  const { token } = await params
+  const { id } = await params
 
   const { data, error } = await parseBody(req, bodySchema)
   if (error) return error
 
   const brief = await prisma.projectBrief.findUnique({
-    where: { shareToken: token },
+    where: { id },
     select: { id: true, clientName: true, projectName: true, status: true },
   })
   if (!brief) return notFound()

@@ -14,6 +14,7 @@ export default async function DashboardPage() {
       status: true,
       submittedAt: true,
       updatedAt: true,
+      owner: { select: { name: true } },
     },
   })
 
@@ -21,7 +22,12 @@ export default async function DashboardPage() {
     <BriefsList
       briefs={briefs.map(
         (b): BriefListItem => ({
-          ...b,
+          id: b.id,
+          clientName: b.clientName,
+          projectName: b.projectName,
+          shareToken: b.shareToken,
+          status: b.status,
+          ownerName: b.owner?.name ?? null,
           submittedAt: b.submittedAt?.toISOString() ?? null,
           updatedAt: b.updatedAt.toISOString(),
         })

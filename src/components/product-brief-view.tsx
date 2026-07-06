@@ -26,7 +26,7 @@ export function ProductBriefView({
   const handleGenerate = async () => {
     setGenerating(true)
     try {
-      const res = await fetch(`/api/briefs/${brief.shareToken}/generate`, {
+      const res = await fetch(`/api/briefs/${brief.id}/generate`, {
         method: "POST",
       })
       const data = await res.json()

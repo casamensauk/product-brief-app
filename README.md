@@ -27,8 +27,8 @@ Turn client discovery questionnaires into structured product briefs.
 
 ```bash
 npm install
-cp .env.example .env   # then fill in the values below
-npx prisma db push     # creates/updates tables
+cp .env.example .env       # then fill in the values below
+npx prisma migrate deploy  # applies committed migrations
 npm run dev
 ```
 
@@ -57,8 +57,34 @@ sign-up form.
 - AI endpoints are session-gated, so an anonymous visitor can never spend
   your OpenRouter credits.
 
+## Database migrations
+
+Schema changes are tracked as committed Prisma migrations in
+`prisma/migrations`. To apply them (locally or in CI/production):
+
+```bash
+npx prisma migrate deploy
+```
+
+To author a new migration after editing `prisma/schema.prisma`, generate the
+SQL by diffing the live database against the schema, then apply it. Neon has no
+shadow database, so `migrate dev` is not used — diff manually instead:
+
+```bash
+# writes the ALTER/CREATE statements for your schema edits
+npx prisma migrate diff \
+  --from-config-datasource \
+  --to-schema=prisma/schema.prisma \
+  --script > prisma/migrations/<timestamp>_<name>/migration.sql
+
+npx prisma migrate deploy
+```
+
+The Prisma CLI reads `DATABASE_URL_UNPOOLED` (falling back to `DATABASE_URL`)
+via `prisma.config.ts`.
+
 ## Deployment
 
 Any Node host works (Railway, Vercel, Fly…). Set the env vars above with
-`BETTER_AUTH_URL` pointing at your public URL, and run `npx prisma db push`
-against the production database once per schema change.
+`BETTER_AUTH_URL` pointing at your public URL, and run `npx prisma migrate
+deploy` against the production database as part of each release.

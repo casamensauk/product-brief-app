@@ -21,13 +21,15 @@ export async function GET(req: Request) {
       submittedAt: true,
       createdAt: true,
       updatedAt: true,
+      owner: { select: { name: true } },
     },
   })
   return NextResponse.json(briefs)
 }
 
 export async function POST(req: Request) {
-  if (!(await requireSession(req))) return unauthorized()
+  const session = await requireSession(req)
+  if (!session) return unauthorized()
 
   const { data, error } = await parseBody(req, createBriefSchema)
   if (error) return error
@@ -40,6 +42,7 @@ export async function POST(req: Request) {
       shareToken: randomBytes(24).toString("base64url"),
       status: "DRAFT",
       questions: DEFAULT_QUESTIONS,
+      ownerId: session.user.id,
     },
   })
   return NextResponse.json(brief, { status: 201 })

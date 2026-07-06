@@ -56,7 +56,7 @@ export function ClientQuestionnaire({
 
       setSaveState("saving")
       try {
-        const res = await fetch(`/api/briefs/${token}/answers`, {
+        const res = await fetch(`/api/public/briefs/${token}/answers`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ answers: toSave }),
@@ -116,7 +116,7 @@ export function ClientQuestionnaire({
     if (saveTimer.current) clearTimeout(saveTimer.current)
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/briefs/${token}/submit`, {
+      const res = await fetch(`/api/public/briefs/${token}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers }),

@@ -8,6 +8,7 @@ import {
   LinkIcon,
   Loader2,
   Pencil,
+  RefreshCw,
   Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -75,6 +76,8 @@ export function BriefWorkspace({ initialBrief }: { initialBrief: BriefData }) {
   const [copied, setCopied] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [rotating, setRotating] = useState(false)
+  const [rotateOpen, setRotateOpen] = useState(false)
   const clientUrl = useShareUrl(brief.shareToken)
 
   const patchBrief = async (
@@ -85,7 +88,7 @@ export function BriefWorkspace({ initialBrief }: { initialBrief: BriefData }) {
     >
   ): Promise<boolean> => {
     try {
-      const res = await fetch(`/api/briefs/${brief.shareToken}`, {
+      const res = await fetch(`/api/briefs/${brief.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(fields),
@@ -100,10 +103,26 @@ export function BriefWorkspace({ initialBrief }: { initialBrief: BriefData }) {
     }
   }
 
+  const handleRotate = async () => {
+    setRotating(true)
+    try {
+      const res = await fetch(`/api/briefs/${brief.id}/rotate-link`, { method: "POST" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to rotate the link")
+      setBrief((prev) => ({ ...prev, shareToken: data.shareToken }))
+      setRotateOpen(false)
+      toast.success("New client link generated — the old one no longer works")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to rotate the link")
+    } finally {
+      setRotating(false)
+    }
+  }
+
   const handleDelete = async () => {
     setDeleting(true)
     try {
-      const res = await fetch(`/api/briefs/${brief.shareToken}`, { method: "DELETE" })
+      const res = await fetch(`/api/briefs/${brief.id}`, { method: "DELETE" })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || "Failed to delete the session")
@@ -208,10 +227,40 @@ export function BriefWorkspace({ initialBrief }: { initialBrief: BriefData }) {
           </div>
           <div className="truncate font-mono text-sm">{clientUrl}</div>
         </div>
-        <Button variant="outline" onClick={handleCopy} className="shrink-0">
-          {copied ? <Check className="size-4 text-success" /> : <LinkIcon className="size-4" />}
-          {copied ? "Copied" : "Copy link"}
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" onClick={handleCopy}>
+            {copied ? <Check className="size-4 text-success" /> : <LinkIcon className="size-4" />}
+            {copied ? "Copied" : "Copy link"}
+          </Button>
+          <Dialog open={rotateOpen} onOpenChange={setRotateOpen}>
+            <DialogTrigger
+              render={
+                <Button variant="outline" size="icon" aria-label="Rotate client link">
+                  <RefreshCw className="size-4" />
+                </Button>
+              }
+            />
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Generate a new client link?</DialogTitle>
+                <DialogDescription>
+                  The current link will stop working immediately. Use this if the
+                  old link was shared with the wrong person. Any answers already
+                  saved are kept.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setRotateOpen(false)} disabled={rotating}>
+                  Cancel
+                </Button>
+                <Button onClick={handleRotate} disabled={rotating}>
+                  {rotating && <Loader2 className="size-4 animate-spin" />}
+                  Generate new link
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div role="tablist" aria-label="Brief sections" className="flex gap-1 rounded-lg bg-muted p-1">
@@ -234,7 +283,7 @@ export function BriefWorkspace({ initialBrief }: { initialBrief: BriefData }) {
 
       {tab === "questionnaire" && (
         <QuestionnaireBuilder
-          shareToken={brief.shareToken}
+          briefId={brief.id}
           initialQuestions={brief.questions}
           locked={brief.status !== "DRAFT"}
           onSave={async (questions) => {

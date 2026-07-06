@@ -24,6 +24,7 @@ export type BriefListItem = {
   projectName: string | null
   shareToken: string
   status: BriefStatus
+  ownerName: string | null
   submittedAt: string | null
   updatedAt: string
 }
@@ -133,9 +134,12 @@ export function BriefsList({ briefs }: { briefs: BriefListItem[] }) {
                   <tr
                     key={brief.id}
                     className="cursor-pointer transition-colors hover:bg-muted/40"
-                    onClick={() => router.push(`/dashboard/brief/${brief.shareToken}`)}
+                    onClick={() => router.push(`/dashboard/brief/${brief.id}`)}
                   >
-                    <td className="px-4 py-3 font-medium">
+                    <td
+                      className="px-4 py-3 font-medium"
+                      title={brief.ownerName ? `Created by ${brief.ownerName}` : undefined}
+                    >
                       {brief.projectName || "Untitled project"}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{brief.clientName}</td>
