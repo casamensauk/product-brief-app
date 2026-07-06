@@ -45,6 +45,8 @@ export async function sendEmail(options: {
         html: options.html,
         ...(options.text ? { text: options.text } : {}),
       }),
+      // Never let a slow/hung Resend API block the request indefinitely.
+      signal: AbortSignal.timeout(10_000),
     })
     if (!res.ok) {
       const detail = await res.text().catch(() => "")
@@ -62,12 +64,14 @@ export async function sendEmail(options: {
 // Templates (inline styles for email-client compatibility)
 // ---------------------------------------------------------------------------
 
-function escapeHtml(value: string): string {
-  return value
+function escapeHtml(value: string | null | undefined): string {
+  if (!value) return ""
+  return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#x27;")
 }
 
 function layout(options: { agencyName: string; heading: string; body: string }): string {

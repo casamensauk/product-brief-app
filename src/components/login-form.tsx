@@ -39,11 +39,19 @@ export function LoginForm({ allowSignUp }: { allowSignUp: boolean }) {
     setLoading(true)
 
     if (mode === "forgot") {
-      await authClient.requestPasswordReset({ email, redirectTo: "/reset-password" })
-      // Always generic — never reveal whether the account exists.
-      setNotice(
-        "If an account exists for that email, we've sent a link to reset your password."
-      )
+      const { error } = await authClient.requestPasswordReset({
+        email,
+        redirectTo: "/reset-password",
+      })
+      // Transport-level failures (rate limit, network) are surfaced — they
+      // don't reveal whether the account exists. Success stays generic.
+      if (error) {
+        setError(error.message || "Something went wrong. Please try again.")
+      } else {
+        setNotice(
+          "If an account exists for that email, we've sent a link to reset your password."
+        )
+      }
       setLoading(false)
       return
     }

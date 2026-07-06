@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextResponse, after } from "next/server"
 import * as z from "zod"
 import { prisma } from "@/lib/prisma"
 import { jsonError, notFound, parseBody, tooManyRequests } from "@/lib/api"
@@ -55,7 +55,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     },
   })
 
-  await notifyOwner(brief)
+  // Notify the owner after the response is sent, so email latency never
+  // delays the client's submission.
+  after(() => notifyOwner(brief))
 
   return NextResponse.json({ ok: true })
 }
