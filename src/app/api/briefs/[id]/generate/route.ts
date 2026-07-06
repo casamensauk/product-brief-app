@@ -1,18 +1,22 @@
-import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireSession } from "@/lib/session"
 import { jsonError, notFound, unauthorized } from "@/lib/api"
-import { AIError, completeJson } from "@/lib/ai"
+import { AIError, parseModelJson, streamCompletion } from "@/lib/ai"
 import { answersSchema, productBriefSchema } from "@/lib/schemas"
 import { parseQuestions } from "@/lib/answers"
+import { detectNewSections } from "@/lib/stream"
+import { BRIEF_SYSTEM_PROMPT, answeredContext, buildFullBriefPrompt } from "@/lib/brief-prompt"
+import { snapshotBriefVersion } from "@/lib/versions"
 
 export const maxDuration = 120
 
-const SYSTEM_PROMPT = `You are an expert business analyst and product strategist at a software agency.
-You turn raw client discovery answers into rigorous, actionable product briefs.
-You always respond with a single valid JSON object and nothing else.
-Never invent facts: where the client did not provide information, say so explicitly (e.g. "Not specified — clarify with client") or list it under openQuestions.`
-
+// Streams generation progress as Server-Sent Events:
+//   event: progress  data: {"section":"goals"}
+//   event: done      data: <updated brief>
+//   event: error     data: {"error":"..."}
+// Preconditions (auth, missing brief, no answers) are returned as normal
+// JSON errors before the stream starts; once streaming begins every outcome
+// — including a missing API key — arrives as an event.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await requireSession(req))) return unauthorized()
   const { id } = await params
@@ -20,78 +24,77 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const brief = await prisma.projectBrief.findUnique({ where: { id } })
   if (!brief) return notFound()
 
-  const questions = parseQuestions(brief.questions)
   const answersResult = answersSchema.safeParse(brief.rawClientAnswers)
-  const answers = answersResult.success ? answersResult.data : {}
-
-  const answered = questions
-    .map((q) => {
-      const value = answers[q.id]
-      const text = Array.isArray(value) ? value.join(", ") : value?.trim()
-      return text ? `Q: ${q.label}\nA: ${text}` : null
-    })
-    .filter(Boolean)
-
-  if (answered.length === 0) {
+  const context = answeredContext(
+    parseQuestions(brief.questions),
+    answersResult.success ? answersResult.data : {}
+  )
+  if (!context) {
     return jsonError("The client has not answered the questionnaire yet.", 400)
   }
 
-  const prompt = `Create a complete product brief from this client discovery questionnaire.
+  const prompt = buildFullBriefPrompt({
+    clientName: brief.clientName,
+    projectName: brief.projectName,
+    context,
+  })
 
-Project metadata:
-- Client: ${brief.clientName}
-- Project: ${brief.projectName || "(not specified)"}
+  const encoder = new TextEncoder()
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: string, data: unknown) =>
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
 
-Questionnaire answers:
-${answered.join("\n\n")}
+      const seen = new Set<string>()
+      let accumulated = ""
 
-Instructions:
-- Base everything strictly on the answers above. Flag gaps rather than inventing details.
-- requirements: extract every explicit or clearly implied requirement, categorised (Functional | Non-functional | Technical | Operational | Transitional) and prioritised with MoSCoW (Must-have | Should-have | Nice-to-have).
-- userStories: written as "As a <user>, I want <capability>, so that <benefit>".
-- scope.outOfScope: things adjacent to the request that are explicitly or implicitly excluded from a first version.
-- risks: real delivery risks for this specific project, each with a mitigation.
-- openQuestions: concrete questions the agency should ask the client next.
-- executiveSummary: 3-5 sentences a stakeholder could read in isolation.
+      try {
+        const content = await streamCompletion({
+          system: BRIEF_SYSTEM_PROMPT,
+          prompt,
+          onDelta: (delta) => {
+            accumulated += delta
+            for (const section of detectNewSections(accumulated, seen)) {
+              send("progress", { section })
+            }
+          },
+        })
 
-Return JSON in exactly this shape:
-{
-  "executiveSummary": "string",
-  "problemStatement": "string",
-  "goals": ["string"],
-  "targetUsers": [{ "persona": "string", "description": "string" }],
-  "stakeholders": [{ "name": "string", "role": "string", "interest": "string" }],
-  "userStories": ["string"],
-  "requirements": [{ "name": "string", "description": "string", "category": "Functional|Non-functional|Technical|Operational|Transitional", "priority": "Must-have|Should-have|Nice-to-have" }],
-  "scope": { "inScope": ["string"], "outOfScope": ["string"] },
-  "assumptions": ["string"],
-  "risks": [{ "risk": "string", "mitigation": "string" }],
-  "openQuestions": ["string"],
-  "timeline": "string",
-  "budget": "string",
-  "successMetrics": ["string"]
-}`
+        const parsed = productBriefSchema.safeParse(parseModelJson(content))
+        if (!parsed.success) {
+          console.error("Generated brief failed validation:", parsed.error.issues[0])
+          send("error", { error: "The AI returned an unusable brief. Please try again." })
+          return
+        }
 
-  try {
-    const raw = await completeJson({ system: SYSTEM_PROMPT, prompt })
-    const parsed = productBriefSchema.safeParse(raw)
-    if (!parsed.success) {
-      console.error("Generated brief failed validation:", parsed.error.issues[0])
-      return jsonError("The AI returned an unusable brief. Please try again.", 502)
-    }
+        await snapshotBriefVersion(id, brief.generatedBrief, "Before regeneration")
 
-    const updated = await prisma.projectBrief.update({
-      where: { id },
-      data: {
-        generatedBrief: parsed.data,
-        // Move the workflow forward, but never regress a later status.
-        ...(brief.status === "SUBMITTED" && { status: "REVIEWED" as const }),
-      },
-    })
-    return NextResponse.json(updated)
-  } catch (err) {
-    if (err instanceof AIError) return jsonError(err.message, err.status)
-    console.error("generate failed:", err)
-    return jsonError("Failed to generate the brief. Please try again.", 500)
-  }
+        const updated = await prisma.projectBrief.update({
+          where: { id },
+          data: {
+            generatedBrief: parsed.data,
+            ...(brief.status === "SUBMITTED" && { status: "REVIEWED" as const }),
+          },
+        })
+        send("done", updated)
+      } catch (err) {
+        const message =
+          err instanceof AIError
+            ? err.message
+            : "Failed to generate the brief. Please try again."
+        if (!(err instanceof AIError)) console.error("generate stream failed:", err)
+        send("error", { error: message })
+      } finally {
+        controller.close()
+      }
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-store",
+      Connection: "keep-alive",
+    },
+  })
 }
