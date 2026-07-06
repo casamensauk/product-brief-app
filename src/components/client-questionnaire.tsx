@@ -5,12 +5,21 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
+  File as FileIcon,
   FileText,
   Loader2,
+  Paperclip,
   Pencil,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import type { Answers, Question } from "@/lib/schemas"
+import {
+  ACCEPT_ATTR,
+  MAX_ATTACHMENTS_PER_BRIEF,
+  MAX_ATTACHMENT_SIZE,
+  formatFileSize,
+} from "@/lib/attachments"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -20,6 +29,13 @@ import { Textarea } from "@/components/ui/textarea"
 
 type SaveState = "idle" | "saving" | "saved" | "error"
 
+export type AttachmentMeta = {
+  id: string
+  filename: string
+  mimeType: string
+  size: number
+}
+
 // Steps: 0 = intro, 1..N = questions, N+1 = review
 export function ClientQuestionnaire({
   token,
@@ -28,6 +44,7 @@ export function ClientQuestionnaire({
   questions,
   initialAnswers,
   alreadySubmitted,
+  initialAttachments,
 }: {
   token: string
   clientName: string
@@ -35,6 +52,7 @@ export function ClientQuestionnaire({
   questions: Question[]
   initialAnswers: Answers
   alreadySubmitted: boolean
+  initialAttachments: AttachmentMeta[]
 }) {
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<Answers>(initialAnswers)
@@ -42,6 +60,7 @@ export function ClientQuestionnaire({
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(alreadySubmitted)
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<AttachmentMeta[]>(initialAttachments)
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveAbort = useRef<AbortController | null>(null)
@@ -230,6 +249,12 @@ export function ClientQuestionnaire({
               </div>
             )
           })}
+
+          <AttachmentsUpload
+            token={token}
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
+          />
 
           <div className="flex items-center justify-between gap-3 pt-2">
             <Button variant="outline" onClick={() => setStep(totalSteps)}>
@@ -421,4 +446,143 @@ function QuestionInput({
       )
     }
   }
+}
+
+function AttachmentsUpload({
+  token,
+  attachments,
+  onAttachmentsChange,
+}: {
+  token: string
+  attachments: AttachmentMeta[]
+  onAttachmentsChange: (next: AttachmentMeta[]) => void
+}) {
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setError(null)
+
+    const remaining = MAX_ATTACHMENTS_PER_BRIEF - attachments.length
+    if (remaining <= 0) {
+      setError(`You can attach up to ${MAX_ATTACHMENTS_PER_BRIEF} files.`)
+      return
+    }
+
+    const toUpload = Array.from(files).slice(0, remaining)
+    if (files.length > remaining) {
+      setError(`Only ${remaining} more file${remaining === 1 ? "" : "s"} can be added.`)
+    }
+
+    setUploading(true)
+    let current = attachments
+    for (const file of toUpload) {
+      if (file.size > MAX_ATTACHMENT_SIZE) {
+        setError(`"${file.name}" is larger than 5 MB and wasn't uploaded.`)
+        continue
+      }
+      try {
+        const formData = new FormData()
+        formData.append("file", file)
+        const res = await fetch(`/api/public/briefs/${token}/attachments`, {
+          method: "POST",
+          body: formData,
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || "Failed to upload")
+        current = [...current, data]
+        onAttachmentsChange(current)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : `Failed to upload "${file.name}"`)
+      }
+    }
+    setUploading(false)
+    if (inputRef.current) inputRef.current.value = ""
+  }
+
+  const handleRemove = async (id: string) => {
+    const previous = attachments
+    onAttachmentsChange(attachments.filter((a) => a.id !== id))
+    try {
+      const res = await fetch(`/api/public/briefs/${token}/attachments/${id}`, {
+        method: "DELETE",
+      })
+      if (!res.ok) throw new Error()
+    } catch {
+      onAttachmentsChange(previous)
+      setError("Failed to remove the file. Please try again.")
+    }
+  }
+
+  return (
+    <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="flex items-center gap-2">
+        <Paperclip className="size-4 text-muted-foreground" />
+        <h2 className="text-sm font-medium">Add supporting files (optional)</h2>
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Logos, sketches, or reference documents. Images or PDF, up to 5 MB each,{" "}
+        {MAX_ATTACHMENTS_PER_BRIEF} files max.
+      </p>
+
+      {attachments.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {attachments.map((a) => (
+            <li
+              key={a.id}
+              className="flex items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2 text-sm"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <FileIcon className="size-4 shrink-0 text-muted-foreground" />
+                <span className="truncate">{a.filename}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {formatFileSize(a.size)}
+                </span>
+              </span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Remove ${a.filename}`}
+                onClick={() => handleRemove(a.id)}
+              >
+                <X className="size-4" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+
+      {attachments.length < MAX_ATTACHMENTS_PER_BRIEF && (
+        <div className="mt-3">
+          <input
+            ref={inputRef}
+            type="file"
+            accept={ACCEPT_ATTR}
+            multiple
+            className="hidden"
+            id="attachment-input"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={uploading}
+            onClick={() => inputRef.current?.click()}
+          >
+            {uploading && <Loader2 className="size-4 animate-spin" />}
+            {uploading ? "Uploading…" : "Add files"}
+          </Button>
+        </div>
+      )}
+    </div>
+  )
 }

@@ -3,6 +3,7 @@ import { useState } from "react"
 import {
   ArrowDown,
   ArrowUp,
+  BookmarkPlus,
   Loader2,
   Lock,
   Plus,
@@ -169,6 +170,7 @@ export function QuestionnaireBuilder({
               )
             }}
           />
+          <SaveTemplateDialog questions={questions} />
           <Button
             onClick={handleSave}
             disabled={saving || !dirty}
@@ -419,6 +421,80 @@ function SuggestQuestionsDialog({
               <Sparkles className="size-4" />
             )}
             {generating ? "Drafting…" : "Draft questions"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function SaveTemplateDialog({ questions }: { questions: Question[] }) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const result = questionsSchema.safeParse(questions)
+      if (!result.success) {
+        toast.error(
+          "Fix the questionnaire below before saving it as a template (every question needs a label)."
+        )
+        return
+      }
+      const res = await fetch("/api/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), questions: result.data }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to save the template")
+      toast.success(`Saved "${name.trim()}" as a template`)
+      setOpen(false)
+      setName("")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save the template")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button variant="outline">
+            <BookmarkPlus className="size-4" />
+            Save as template
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Save as template</DialogTitle>
+          <DialogDescription>
+            Reuse this questionnaire (in its current, unsaved state) as a
+            starting point for future discovery sessions.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2 py-2">
+          <Label htmlFor="template-name">Template name</Label>
+          <Input
+            id="template-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. B2B SaaS discovery"
+            maxLength={200}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={!name.trim() || saving}>
+            {saving && <Loader2 className="size-4 animate-spin" />}
+            Save template
           </Button>
         </DialogFooter>
       </DialogContent>

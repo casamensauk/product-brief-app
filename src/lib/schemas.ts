@@ -57,6 +57,9 @@ export const createBriefSchema = z.object({
   contactEmail: z
     .union([z.literal(""), z.email("Enter a valid email")])
     .optional(),
+  // Id of a saved QuestionnaireTemplate to seed the questions from. Omitted
+  // (or "default") uses the built-in default questionnaire.
+  templateId: z.string().min(1).optional(),
 })
 
 export const updateBriefSchema = z.object({
@@ -65,6 +68,15 @@ export const updateBriefSchema = z.object({
   contactEmail: z.union([z.literal(""), z.email()]).nullable().optional(),
   status: z.enum(["DRAFT", "SUBMITTED", "REVIEWED", "SCOPED"]).optional(),
   questions: questionsSchema.optional(),
+})
+
+// ---------------------------------------------------------------------------
+// Questionnaire templates
+// ---------------------------------------------------------------------------
+
+export const createTemplateSchema = z.object({
+  name: z.string().trim().min(1, "Template name is required").max(200),
+  questions: questionsSchema,
 })
 
 // ---------------------------------------------------------------------------

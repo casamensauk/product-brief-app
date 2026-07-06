@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2, Plus } from "lucide-react"
 import { toast } from "sonner"
@@ -15,6 +15,15 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+type TemplateOption = { id: string; name: string; questionCount: number }
 
 export function CreateBriefDialog({ trigger }: { trigger?: React.ReactElement }) {
   const router = useRouter()
@@ -23,6 +32,23 @@ export function CreateBriefDialog({ trigger }: { trigger?: React.ReactElement })
   const [clientName, setClientName] = useState("")
   const [projectName, setProjectName] = useState("")
   const [contactEmail, setContactEmail] = useState("")
+  const [templateId, setTemplateId] = useState("default")
+  const [templates, setTemplates] = useState<TemplateOption[]>([])
+
+  useEffect(() => {
+    if (!open) return
+    fetch("/api/templates")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setTemplates(Array.isArray(data) ? data : []))
+      .catch(() => setTemplates([]))
+  }, [open])
+
+  const templateItems = {
+    default: "Default questionnaire",
+    ...Object.fromEntries(
+      templates.map((t) => [t.id, `${t.name} (${t.questionCount} questions)`])
+    ),
+  }
 
   const handleCreate = async () => {
     if (creating) return
@@ -31,7 +57,7 @@ export function CreateBriefDialog({ trigger }: { trigger?: React.ReactElement })
       const res = await fetch("/api/briefs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientName, projectName, contactEmail }),
+        body: JSON.stringify({ clientName, projectName, contactEmail, templateId }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to create the session")
@@ -97,6 +123,22 @@ export function CreateBriefDialog({ trigger }: { trigger?: React.ReactElement })
               onChange={(e) => setContactEmail(e.target.value)}
               placeholder="client@example.com"
             />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="template">Questionnaire</Label>
+            <Select value={templateId} onValueChange={(v) => setTemplateId(v as string)} items={templateItems}>
+              <SelectTrigger id="template" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Default questionnaire</SelectItem>
+                {templates.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name} ({t.questionCount} questions)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </form>
         <DialogFooter>
