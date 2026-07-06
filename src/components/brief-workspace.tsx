@@ -107,8 +107,9 @@ export function BriefWorkspace({ initialBrief }: { initialBrief: BriefData }) {
     setRotating(true)
     try {
       const res = await fetch(`/api/briefs/${brief.id}/rotate-link`, { method: "POST" })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Failed to rotate the link")
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to rotate the link")
+      if (!data?.shareToken) throw new Error("Unexpected response from the server")
       setBrief((prev) => ({ ...prev, shareToken: data.shareToken }))
       setRotateOpen(false)
       toast.success("New client link generated — the old one no longer works")

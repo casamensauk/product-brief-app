@@ -18,6 +18,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const brief = await prisma.projectBrief.update({
     where: { id },
     data: { shareToken: randomBytes(24).toString("base64url") },
+    select: { shareToken: true },
   })
   return NextResponse.json(brief)
 }
