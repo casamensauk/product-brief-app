@@ -35,7 +35,7 @@ export function CreateBriefDialog({ trigger }: { trigger?: React.ReactElement })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to create the session")
-      router.push(`/dashboard/brief/${data.shareToken}`)
+      router.push(`/dashboard/brief/${data.id}`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create the session")
       setCreating(false)

@@ -21,6 +21,13 @@ model ProjectBrief {
   shareToken   String      @unique
   status       BriefStatus @default(DRAFT)
 
+  // Creator of the session. Nullable so briefs survive a user being deleted.
+  ownerId String?
+  owner   User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  // Token for the public read-only brief share page (WP10). Null = not shared.
+  briefShareToken String? @unique
+
   // Questionnaire definition shown to the client (array of Question objects,
   // see src/lib/schemas.ts)
   questions Json?
@@ -31,18 +38,58 @@ model ProjectBrief {
   // AI-generated product brief document (see productBriefSchema in src/lib/schemas.ts)
   generatedBrief Json?
 
-  // Legacy columns from the pre-rebuild RAD structure. Kept so existing rows
-  // are not dropped; no longer written by the app. Safe to remove once old
-  // data is confirmed disposable.
-  stakeholders            Json?
-  gatheringMethods        Json?
-  categorisedRequirements Json?
-  analysisModels          Json?
-  documentationData       Json?
+  attachments Attachment[]
+  versions    BriefVersion[]
 
   submittedAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@index([ownerId])
+}
+
+// Reusable questionnaire saved from the builder (WP5).
+model QuestionnaireTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  questions   Json
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Snapshot of a generated brief taken before regeneration/restore (WP7).
+model BriefVersion {
+  id        String       @id @default(uuid())
+  briefId   String
+  brief     ProjectBrief @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  content   Json
+  label     String
+  createdAt DateTime     @default(now())
+
+  @@index([briefId])
+}
+
+// Client-uploaded supporting file, stored as bytes in Postgres (WP6).
+model Attachment {
+  id        String       @id @default(uuid())
+  briefId   String
+  brief     ProjectBrief @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  filename  String
+  mimeType  String
+  size      Int
+  data      Bytes
+  createdAt DateTime     @default(now())
+
+  @@index([briefId])
+}
+
+// Single-row workspace branding/config (WP10).
+model WorkspaceSettings {
+  id         String   @id @default("default")
+  agencyName String   @default("Discovery Pro")
+  logoUrl    String?
+  updatedAt  DateTime @updatedAt
 }
 
 // ---------------------------------------------------------------------------
@@ -50,15 +97,16 @@ model ProjectBrief {
 // ---------------------------------------------------------------------------
 
 model User {
-  id            String    @id
+  id            String         @id
   name          String
   email         String
-  emailVerified Boolean   @default(false)
+  emailVerified Boolean        @default(false)
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   sessions      Session[]
   accounts      Account[]
+  briefs        ProjectBrief[]
 
   @@unique([email])
   @@map("user")

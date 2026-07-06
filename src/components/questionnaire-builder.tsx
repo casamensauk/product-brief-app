@@ -55,12 +55,12 @@ function newQuestion(): Question {
 }
 
 export function QuestionnaireBuilder({
-  shareToken,
+  briefId,
   initialQuestions,
   locked,
   onSave,
 }: {
-  shareToken: string
+  briefId: string
   initialQuestions: Question[]
   locked: boolean
   onSave: (questions: Question[]) => Promise<boolean>
@@ -160,7 +160,7 @@ export function QuestionnaireBuilder({
         </p>
         <div className="flex items-center gap-2">
           <SuggestQuestionsDialog
-            shareToken={shareToken}
+            briefId={briefId}
             onReplace={(next) => {
               setQuestions(next)
               setDirty(true)
@@ -346,10 +346,10 @@ function QuestionCard({
 }
 
 function SuggestQuestionsDialog({
-  shareToken,
+  briefId,
   onReplace,
 }: {
-  shareToken: string
+  briefId: string
   onReplace: (questions: Question[]) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -359,7 +359,7 @@ function SuggestQuestionsDialog({
   const handleGenerate = async () => {
     setGenerating(true)
     try {
-      const res = await fetch(`/api/briefs/${shareToken}/suggest-questions`, {
+      const res = await fetch(`/api/briefs/${briefId}/suggest-questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ instructions }),

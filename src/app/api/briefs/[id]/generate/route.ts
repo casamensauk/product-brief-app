@@ -13,11 +13,11 @@ You turn raw client discovery answers into rigorous, actionable product briefs.
 You always respond with a single valid JSON object and nothing else.
 Never invent facts: where the client did not provide information, say so explicitly (e.g. "Not specified — clarify with client") or list it under openQuestions.`
 
-export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await requireSession(req))) return unauthorized()
-  const { token } = await params
+  const { id } = await params
 
-  const brief = await prisma.projectBrief.findUnique({ where: { shareToken: token } })
+  const brief = await prisma.projectBrief.findUnique({ where: { id } })
   if (!brief) return notFound()
 
   const questions = parseQuestions(brief.questions)
@@ -81,7 +81,7 @@ Return JSON in exactly this shape:
     }
 
     const updated = await prisma.projectBrief.update({
-      where: { shareToken: token },
+      where: { id },
       data: {
         generatedBrief: parsed.data,
         // Move the workflow forward, but never regress a later status.

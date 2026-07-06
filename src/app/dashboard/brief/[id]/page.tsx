@@ -9,12 +9,12 @@ export const dynamic = "force-dynamic"
 export default async function BriefPage({
   params,
 }: {
-  params: Promise<{ token: string }>
+  params: Promise<{ id: string }>
 }) {
-  const { token } = await params
+  const { id } = await params
 
   const brief = await prisma.projectBrief.findUnique({
-    where: { shareToken: token },
+    where: { id },
   })
   if (!brief) notFound()
 

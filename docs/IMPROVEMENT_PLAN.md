@@ -215,16 +215,20 @@ model WorkspaceSettings {
 
 Add the inverse relation `briefs ProjectBrief[]` on `User`.
 
-**Migration strategy** (live Neon DB has no migration history; no shadow DB):
+**Migration strategy** (live Neon DB has no migration history; no shadow DB).
+Note: **Prisma 7 removed `--to-url`/`--from-url`** — use
+`--from-config-datasource` / `--to-config-datasource` (resolves the datasource
+from `prisma.config.ts`) and `--to-schema=<path>` instead. This baseline was
+already created in WP1; later WPs only author step-2-style migrations:
 
-1. Baseline: `npx prisma migrate diff --from-empty --to-url "$DATABASE_URL_UNPOOLED" --script`
-   → save as `prisma/migrations/<ts>_baseline/migration.sql`, then
-   `npx prisma migrate resolve --applied <ts>_baseline`.
-2. Edit `schema.prisma` (additions above + legacy column removal), then
-   `npx prisma migrate diff --from-url "$DATABASE_URL_UNPOOLED" --to-schema-datamodel prisma/schema.prisma --script`
-   → save as second migration, apply with `npx prisma migrate deploy`.
-3. Document in README: schema changes now go through
-   `migrate diff` + `migrate deploy` (no shadow database on Neon).
+1. Baseline (done in WP1): `npx prisma migrate diff --from-empty --to-config-datasource --script`
+   → saved as `prisma/migrations/20260706000000_baseline/migration.sql`, then
+   `npx prisma migrate resolve --applied 20260706000000_baseline`.
+2. Edit `schema.prisma`, then
+   `npx prisma migrate diff --from-config-datasource --to-schema=prisma/schema.prisma --script`
+   → save as `prisma/migrations/<ts>_<name>/migration.sql`, review the SQL,
+   apply with `npx prisma migrate deploy`, then `npx prisma generate`.
+3. README already documents this workflow (no shadow database on Neon).
 
 **Authorized destructive cleanup** (explicitly approved by the user):
 dropping the 5 legacy columns (only the 3 junk briefs ever had data in them),
