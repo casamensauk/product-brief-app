@@ -1,14 +1,21 @@
 import { NextResponse } from "next/server"
 import * as z from "zod"
 import { prisma } from "@/lib/prisma"
-import { jsonError, notFound, parseBody } from "@/lib/api"
+import { jsonError, notFound, parseBody, tooManyRequests } from "@/lib/api"
 import { answersSchema } from "@/lib/schemas"
 import { parseQuestions, sanitizeAnswers } from "@/lib/answers"
+import { checkRateLimit, clientIp } from "@/lib/rate-limit"
 
 // Public endpoint: the unguessable share token is the capability. It only
 // accepts questionnaire answers — nothing else on the brief can be written.
 export async function PUT(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
+
+  const limit = checkRateLimit(`answers:${clientIp(req)}:${token}`, {
+    windowMs: 60_000,
+    max: 30,
+  })
+  if (!limit.allowed) return tooManyRequests(limit.retryAfter)
 
   const { data, error } = await parseBody(req, z.object({ answers: answersSchema }))
   if (error) return error

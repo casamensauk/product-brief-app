@@ -7,6 +7,7 @@ import {
   Check,
   LinkIcon,
   Loader2,
+  Mail,
   Pencil,
   RefreshCw,
   Trash2,
@@ -63,7 +64,13 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "brief", label: "Product brief" },
 ]
 
-export function BriefWorkspace({ initialBrief }: { initialBrief: BriefData }) {
+export function BriefWorkspace({
+  initialBrief,
+  emailEnabled,
+}: {
+  initialBrief: BriefData
+  emailEnabled: boolean
+}) {
   const router = useRouter()
   const [brief, setBrief] = useState(initialBrief)
   const [tab, setTab] = useState<Tab>(
@@ -78,7 +85,28 @@ export function BriefWorkspace({ initialBrief }: { initialBrief: BriefData }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [rotating, setRotating] = useState(false)
   const [rotateOpen, setRotateOpen] = useState(false)
+  const [sendingLink, setSendingLink] = useState(false)
   const clientUrl = useShareUrl(brief.shareToken)
+
+  const handleSendLink = async () => {
+    setSendingLink(true)
+    try {
+      const res = await fetch(`/api/briefs/${brief.id}/send-link`, { method: "POST" })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to send the email")
+      toast.success(`Questionnaire link emailed to ${data.to}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send the email")
+    } finally {
+      setSendingLink(false)
+    }
+  }
+
+  const sendLinkDisabledReason = !brief.contactEmail
+    ? "Add a client contact email first (Edit details)"
+    : !emailEnabled
+      ? "Email isn't configured on the server"
+      : undefined
 
   const patchBrief = async (
     fields: Partial<
@@ -228,7 +256,16 @@ export function BriefWorkspace({ initialBrief }: { initialBrief: BriefData }) {
           </div>
           <div className="truncate font-mono text-sm">{clientUrl}</div>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={handleSendLink}
+            disabled={sendingLink || Boolean(sendLinkDisabledReason)}
+            title={sendLinkDisabledReason}
+          >
+            {sendingLink ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
+            Email to client
+          </Button>
           <Button variant="outline" onClick={handleCopy}>
             {copied ? <Check className="size-4 text-success" /> : <LinkIcon className="size-4" />}
             {copied ? "Copied" : "Copy link"}

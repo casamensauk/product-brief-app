@@ -13,6 +13,13 @@ export function notFound() {
   return jsonError("Not found", 404)
 }
 
+export function tooManyRequests(retryAfter: number) {
+  return NextResponse.json(
+    { error: "Too many requests — please slow down." },
+    { status: 429, headers: { "Retry-After": String(retryAfter) } }
+  )
+}
+
 /** Parse a request body against a schema; returns data or a 400 response. */
 export async function parseBody<T extends z.ZodType>(
   req: Request,
