@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { FileText } from "lucide-react"
+import { FileText, Settings } from "lucide-react"
 import { getSession } from "@/lib/session"
 import { UserMenu } from "@/components/user-menu"
 
@@ -23,7 +23,16 @@ export default async function DashboardLayout({
             <FileText className="size-5 text-primary" />
             Discovery Pro
           </Link>
-          <UserMenu name={session.user.name} email={session.user.email} />
+          <div className="flex items-center gap-1">
+            <Link
+              href="/dashboard/settings"
+              aria-label="Settings"
+              className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <Settings className="size-4" />
+            </Link>
+            <UserMenu name={session.user.name} email={session.user.email} />
+          </div>
         </div>
       </header>
 

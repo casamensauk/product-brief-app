@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
-import { randomBytes } from "crypto"
+import { randomBytes, randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
 import { requireSession } from "@/lib/session"
-import { parseBody, unauthorized } from "@/lib/api"
-import { createBriefSchema } from "@/lib/schemas"
+import { jsonError, parseBody, unauthorized } from "@/lib/api"
+import { createBriefSchema, questionsSchema, type Question } from "@/lib/schemas"
 import { DEFAULT_QUESTIONS } from "@/lib/templates"
 
 export async function GET(req: Request) {
@@ -34,6 +34,19 @@ export async function POST(req: Request) {
   const { data, error } = await parseBody(req, createBriefSchema)
   if (error) return error
 
+  let questions: Question[] = DEFAULT_QUESTIONS
+  if (data.templateId && data.templateId !== "default") {
+    const template = await prisma.questionnaireTemplate.findUnique({
+      where: { id: data.templateId },
+      select: { questions: true },
+    })
+    if (!template) return jsonError("Template not found", 400)
+    const parsed = questionsSchema.safeParse(template.questions)
+    if (!parsed.success) return jsonError("This template is corrupted", 400)
+    // Fresh ids so answers never collide across briefs that share a template.
+    questions = parsed.data.map((q) => ({ ...q, id: randomUUID() }))
+  }
+
   const brief = await prisma.projectBrief.create({
     data: {
       clientName: data.clientName,
@@ -41,7 +54,7 @@ export async function POST(req: Request) {
       contactEmail: data.contactEmail || null,
       shareToken: randomBytes(24).toString("base64url"),
       status: "DRAFT",
-      questions: DEFAULT_QUESTIONS,
+      questions,
       ownerId: session.user.id,
     },
   })

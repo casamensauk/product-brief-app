@@ -5,11 +5,12 @@ Turn client discovery questionnaires into structured product briefs.
 **The workflow:**
 
 1. **Create a discovery session** for a client/project. It starts with a proven
-   default questionnaire you can edit — or let AI draft one tailored to the
-   project.
+   default questionnaire you can edit, let AI draft one tailored to the
+   project, or start from a saved template (Settings → Questionnaire
+   templates).
 2. **Share one link** with the client. They answer step by step on any device,
-   answers autosave, and required questions are enforced. No client account
-   needed.
+   answers autosave, required questions are enforced, and they can attach
+   supporting files (logos, sketches, PDFs). No client account needed.
 3. **Generate the product brief.** AI turns the answers into a structured
    brief — executive summary, goals, personas, stakeholders, user stories,
    MoSCoW-prioritised requirements, scope, assumptions, risks, open questions,
@@ -68,6 +69,11 @@ without `RESEND_API_KEY` those actions degrade gracefully.
   need shared storage.
 - Server errors are logged as structured JSON via `src/instrumentation.ts`
   (`onRequestError`), where a provider like Sentry can be wired in later.
+- Client-uploaded attachments are stored as bytes directly in Postgres (no
+  external storage dependency), capped at 5 files / 5 MB each per brief, and
+  restricted to images and PDFs by both declared MIME type and filename
+  extension. Uploads are only accepted while a questionnaire is still in
+  `DRAFT`, and downloads require an authenticated session.
 
 ## Database migrations
 

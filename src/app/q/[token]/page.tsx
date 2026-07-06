@@ -27,6 +27,10 @@ export default async function QuestionnairePage({
       status: true,
       questions: true,
       rawClientAnswers: true,
+      attachments: {
+        select: { id: true, filename: true, mimeType: true, size: true },
+        orderBy: { createdAt: "asc" },
+      },
     },
   })
   if (!brief) notFound()
@@ -44,6 +48,7 @@ export default async function QuestionnairePage({
       questions={questions}
       initialAnswers={answersResult.success ? answersResult.data : {}}
       alreadySubmitted={brief.status !== "DRAFT"}
+      initialAttachments={brief.attachments}
     />
   )
 }

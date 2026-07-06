@@ -41,6 +41,14 @@ import { QuestionnaireBuilder } from "@/components/questionnaire-builder"
 import { ResponsesView } from "@/components/responses-view"
 import { ProductBriefView } from "@/components/product-brief-view"
 
+export type AttachmentData = {
+  id: string
+  filename: string
+  mimeType: string
+  size: number
+  createdAt: string
+}
+
 export type BriefData = {
   id: string
   clientName: string
@@ -51,6 +59,7 @@ export type BriefData = {
   questions: Question[]
   answers: Answers
   generatedBrief: ProductBrief | null
+  attachments: AttachmentData[]
   submittedAt: string | null
   createdAt: string
   updatedAt: string

@@ -16,6 +16,12 @@ export default async function BriefPage({
 
   const brief = await prisma.projectBrief.findUnique({
     where: { id },
+    include: {
+      attachments: {
+        select: { id: true, filename: true, mimeType: true, size: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
+      },
+    },
   })
   if (!brief) notFound()
 
@@ -32,6 +38,13 @@ export default async function BriefPage({
     questions: parseQuestions(brief.questions),
     answers: answersResult.success ? answersResult.data : {},
     generatedBrief: brief.generatedBrief ? (briefResult.success ? briefResult.data : null) : null,
+    attachments: brief.attachments.map((a) => ({
+      id: a.id,
+      filename: a.filename,
+      mimeType: a.mimeType,
+      size: a.size,
+      createdAt: a.createdAt.toISOString(),
+    })),
     submittedAt: brief.submittedAt?.toISOString() ?? null,
     createdAt: brief.createdAt.toISOString(),
     updatedAt: brief.updatedAt.toISOString(),

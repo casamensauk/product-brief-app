@@ -1,7 +1,8 @@
 "use client"
-import { LinkIcon, MailQuestion } from "lucide-react"
+import { Download, File as FileIcon, LinkIcon, MailQuestion } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { formatFileSize } from "@/lib/attachments"
 import type { BriefData } from "@/components/brief-workspace"
 
 export function ResponsesView({
@@ -16,7 +17,7 @@ export function ResponsesView({
     return Array.isArray(value) ? value.length > 0 : Boolean(value?.trim())
   })
 
-  if (answered.length === 0) {
+  if (answered.length === 0 && brief.attachments.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-card px-6 py-16 text-center">
         <MailQuestion className="size-10 text-muted-foreground/50" />
@@ -69,6 +70,34 @@ export function ResponsesView({
           )
         })}
       </div>
+
+      {brief.attachments.length > 0 && (
+        <div className="rounded-xl border bg-card p-4">
+          <h3 className="text-sm font-medium">
+            Attached files ({brief.attachments.length})
+          </h3>
+          <ul className="mt-2 space-y-2">
+            {brief.attachments.map((a) => (
+              <li key={a.id} className="flex items-center justify-between gap-2 text-sm">
+                <span className="flex min-w-0 items-center gap-2">
+                  <FileIcon className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{a.filename}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {formatFileSize(a.size)}
+                  </span>
+                </span>
+                <a
+                  href={`/api/attachments/${a.id}`}
+                  className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  <Download className="size-3.5" />
+                  Download
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
