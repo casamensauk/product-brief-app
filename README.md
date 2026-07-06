@@ -42,9 +42,14 @@ npm run dev
 | `BETTER_AUTH_URL` | yes | Canonical app URL (`http://localhost:3000` in dev) |
 | `OPENROUTER_API_KEY` | for AI | Key from [openrouter.ai/keys](https://openrouter.ai/keys). Without it the app works, but AI features return a clear error |
 | `OPENROUTER_MODEL` | no | Defaults to `anthropic/claude-sonnet-4.5` |
+| `RESEND_API_KEY` | for email | Key from [resend.com](https://resend.com). Without it, email actions report a clear "not configured" state instead of sending |
+| `EMAIL_FROM` | for email | Verified sender, e.g. `Discovery Pro <onboarding@resend.dev>` |
+| `ALLOW_SIGNUP` | no | Set to `"false"` to close public sign-up (existing users can still sign in). Defaults to open |
 
 Sign up from `/login` — the first account is created through the normal
-sign-up form.
+sign-up form. Once your team is in, set `ALLOW_SIGNUP="false"` to close the
+door. Email (invites, submission notifications, password reset) is optional:
+without `RESEND_API_KEY` those actions degrade gracefully.
 
 ## Security model
 
@@ -56,6 +61,13 @@ sign-up form.
   touch nothing else on a brief.
 - AI endpoints are session-gated, so an anonymous visitor can never spend
   your OpenRouter credits.
+- Auth routes are rate-limited by better-auth (stricter on sign-in, sign-up,
+  and password reset). The public questionnaire endpoints are rate-limited by
+  a per-instance limiter in `src/lib/rate-limit.ts` (answers 30/min, submit
+  5/min per IP+token). Both are in-memory — a multi-instance deployment would
+  need shared storage.
+- Server errors are logged as structured JSON via `src/instrumentation.ts`
+  (`onRequestError`), where a provider like Sentry can be wired in later.
 
 ## Database migrations
 

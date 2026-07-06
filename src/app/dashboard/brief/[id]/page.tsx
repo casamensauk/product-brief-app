@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { answersSchema, productBriefSchema } from "@/lib/schemas"
 import { parseQuestions } from "@/lib/answers"
+import { emailConfigured } from "@/lib/email"
 import { BriefWorkspace, type BriefData } from "@/components/brief-workspace"
 
 export const dynamic = "force-dynamic"
@@ -36,5 +37,5 @@ export default async function BriefPage({
     updatedAt: brief.updatedAt.toISOString(),
   }
 
-  return <BriefWorkspace initialBrief={data} />
+  return <BriefWorkspace initialBrief={data} emailEnabled={emailConfigured()} />
 }
