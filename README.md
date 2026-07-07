@@ -62,6 +62,23 @@ sign-up form. Once your team is in, set `ALLOW_SIGNUP="false"` to close the
 door. Email (invites, submission notifications, password reset) is optional:
 without `RESEND_API_KEY` those actions degrade gracefully.
 
+## Tests
+
+```bash
+npm test          # unit tests always run; integration runs if TEST_DATABASE_URL is set
+```
+
+- **Unit** tests (`src/**/*.test.ts`) are pure and need no database — answer
+  sanitization, schema fallbacks, markdown export, the rate limiter, and the
+  SSE stream parser.
+- **Integration** tests (`tests/integration/`) invoke the real route handlers
+  against Postgres (auth boundaries, the sign-up → create-brief session flow,
+  the public answer → submit → lock cycle, attachment limits, and sign-up
+  gating). They **skip cleanly when `TEST_DATABASE_URL` is unset**, so
+  `npm test` works out of the box; point it at a throwaway database to run
+  them. GitHub Actions (`.github/workflows/ci.yml`) runs the full suite
+  against a `postgres:16` service on every push and PR.
+
 ## Security model
 
 - `/dashboard/*` and all management APIs require a session (validated
