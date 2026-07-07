@@ -61,7 +61,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   try {
     after(() => notifyOwner(brief))
   } catch {
-    void notifyOwner(brief)
+    notifyOwner(brief).catch((err) => console.error("[submit] notify failed:", err))
   }
 
   return NextResponse.json({ ok: true })
