@@ -56,8 +56,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   })
 
   // Notify the owner after the response is sent, so email latency never
-  // delays the client's submission.
-  after(() => notifyOwner(brief))
+  // delays the client's submission. Outside a request scope (e.g. tests)
+  // `after` throws — fall back to a fire-and-forget send.
+  try {
+    after(() => notifyOwner(brief))
+  } catch {
+    notifyOwner(brief).catch((err) => console.error("[submit] notify failed:", err))
+  }
 
   return NextResponse.json({ ok: true })
 }
