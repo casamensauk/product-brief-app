@@ -140,3 +140,18 @@
     @apply font-heading;
   }
 }
+
+@media print {
+  /* Clean PDF output for the shared brief page. */
+  body {
+    background: #fff;
+  }
+  section,
+  .rounded-lg,
+  li {
+    break-inside: avoid;
+  }
+  @page {
+    margin: 18mm 14mm;
+  }
+}

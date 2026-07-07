@@ -5,10 +5,13 @@ import {
   Download,
   FileText,
   History,
+  LinkIcon,
   Loader2,
+  MessageCircleQuestion,
   Pencil,
   Plus,
   RefreshCw,
+  Share2,
   Sparkles,
   Trash2,
 } from "lucide-react"
@@ -23,8 +26,10 @@ import {
   type BriefSectionKey,
 } from "@/lib/brief-sections"
 import { runBriefGeneration } from "@/lib/brief-stream-client"
-import { Badge } from "@/components/ui/badge"
+import { briefShareUrl, useOrigin } from "@/lib/share"
+import { SectionReadView } from "@/components/brief-read-view"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -43,6 +48,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Select,
@@ -199,6 +205,20 @@ export function ProductBriefView({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-end gap-2">
+        {b.openQuestions.length > 0 && (
+          <FollowUpDialog
+            briefId={brief.id}
+            openQuestions={b.openQuestions}
+            onDone={(updated, emailed) => {
+              applyUpdate(updated)
+              toast.success(
+                emailed
+                  ? "Questionnaire reopened and emailed to the client"
+                  : "Questionnaire reopened — copy the link to send it"
+              )
+            }}
+          />
+        )}
         <HistoryMenu
           briefId={brief.id}
           onRestored={(updated) => {
@@ -210,6 +230,7 @@ export function ProductBriefView({
           {generating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
           {generating ? "Regenerating…" : "Regenerate all"}
         </Button>
+        <ShareBriefDialog briefId={brief.id} initialToken={brief.briefShareToken} />
         <Button onClick={handleExport}>
           <Download className="size-4" />
           Export Markdown
@@ -325,107 +346,6 @@ function BriefSectionCard({
       </div>
     </section>
   )
-}
-
-// ---------------------------------------------------------------------------
-// Read views
-// ---------------------------------------------------------------------------
-
-function SectionReadView({ section, brief }: { section: BriefSection; brief: ProductBrief }) {
-  switch (section.kind) {
-    case "string":
-      return <Prose text={brief[section.key] as string} />
-    case "stringList":
-      return <BulletList items={brief[section.key] as string[]} />
-    case "scope":
-      return (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <h4 className="text-sm font-medium text-success">In scope</h4>
-            <BulletList items={brief.scope.inScope} className="mt-2" />
-          </div>
-          <div>
-            <h4 className="text-sm font-medium text-destructive">Out of scope</h4>
-            <BulletList items={brief.scope.outOfScope} className="mt-2" />
-          </div>
-        </div>
-      )
-    case "targetUsers":
-      return brief.targetUsers.length ? (
-        <ul className="space-y-2 text-sm">
-          {brief.targetUsers.map((u, i) => (
-            <li key={i}>
-              <span className="font-medium">{u.persona}</span>
-              <span className="text-muted-foreground"> — {u.description}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <Empty />
-      )
-    case "stakeholders":
-      return brief.stakeholders.length ? (
-        <ul className="space-y-2 text-sm">
-          {brief.stakeholders.map((s, i) => (
-            <li key={i}>
-              <span className="font-medium">{s.name}</span>
-              <span className="text-muted-foreground">
-                {" "}
-                ({s.role}) — {s.interest}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <Empty />
-      )
-    case "risks":
-      return brief.risks.length ? (
-        <ul className="space-y-2 text-sm">
-          {brief.risks.map((r, i) => (
-            <li key={i} className="rounded-lg border p-3">
-              <span className="font-medium">{r.risk}</span>
-              {r.mitigation && (
-                <p className="mt-1 text-muted-foreground">Mitigation: {r.mitigation}</p>
-              )}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <Empty />
-      )
-    case "requirements":
-      return brief.requirements.length ? (
-        <div className="space-y-3">
-          {brief.requirements.map((r, i) => (
-            <div key={i} className="rounded-lg border p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium">{r.name}</span>
-                <span className="flex gap-1.5">
-                  <Badge variant="outline">{r.category}</Badge>
-                  <Badge
-                    variant={
-                      r.priority === "Must-have"
-                        ? "destructive"
-                        : r.priority === "Should-have"
-                          ? "warning"
-                          : "secondary"
-                    }
-                  >
-                    {r.priority}
-                  </Badge>
-                </span>
-              </div>
-              {r.description && (
-                <p className="mt-2 text-sm text-muted-foreground">{r.description}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <Empty />
-      )
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -767,6 +687,216 @@ function HistoryMenu({
 }
 
 // ---------------------------------------------------------------------------
+// Follow-up questions
+// ---------------------------------------------------------------------------
+
+function FollowUpDialog({
+  briefId,
+  openQuestions,
+  onDone,
+}: {
+  briefId: string
+  openQuestions: string[]
+  onDone: (updated: BriefUpdateResponse, emailed: boolean) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [rows, setRows] = useState<{ text: string; checked: boolean }[]>([])
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleOpenChange = (next: boolean) => {
+    if (next) setRows(openQuestions.map((q) => ({ text: q, checked: true })))
+    setOpen(next)
+  }
+
+  const selected = rows.filter((r) => r.checked && r.text.trim())
+
+  const handleSubmit = async () => {
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/briefs/${briefId}/follow-up`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questions: selected.map((r) => r.text.trim()) }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to send follow-up questions")
+      onDone(data, Boolean(data.emailed))
+      setOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send follow-up questions")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger
+        render={
+          <Button variant="outline">
+            <MessageCircleQuestion className="size-4" />
+            Send follow-up questions
+          </Button>
+        }
+      />
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Send follow-up questions</DialogTitle>
+          <DialogDescription>
+            Pick which open questions to ask the client. This reopens their
+            questionnaire and, if a contact email is set, emails them the link.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 py-2">
+          {rows.map((row, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <Checkbox
+                checked={row.checked}
+                onCheckedChange={(c) =>
+                  setRows((prev) =>
+                    prev.map((r, j) => (j === i ? { ...r, checked: c === true } : r))
+                  )
+                }
+                className="mt-2.5"
+                aria-label={`Include question ${i + 1}`}
+              />
+              <Textarea
+                value={row.text}
+                onChange={(e) =>
+                  setRows((prev) =>
+                    prev.map((r, j) => (j === i ? { ...r, text: e.target.value } : r))
+                  )
+                }
+                className="min-h-[52px]"
+                maxLength={500}
+              />
+            </div>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={submitting || selected.length === 0}>
+            {submitting && <Loader2 className="size-4 animate-spin" />}
+            Reopen questionnaire
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Share (public read-only link)
+// ---------------------------------------------------------------------------
+
+function ShareBriefDialog({
+  briefId,
+  initialToken,
+}: {
+  briefId: string
+  initialToken: string | null
+}) {
+  const [open, setOpen] = useState(false)
+  const [token, setToken] = useState(initialToken)
+  const [working, setWorking] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const origin = useOrigin()
+
+  const url = token ? `${origin}/brief/${token}` : ""
+
+  const act = async (action: "enable" | "rotate" | "disable") => {
+    setWorking(true)
+    try {
+      const res = await fetch(`/api/briefs/${briefId}/share-brief`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Something went wrong")
+      setToken(data.briefShareToken)
+      toast.success(
+        action === "disable"
+          ? "Sharing disabled"
+          : action === "rotate"
+            ? "New share link generated — the old one no longer works"
+            : "Share link created"
+      )
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong")
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(briefShareUrl(token!))
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button variant="outline">
+            <Share2 className="size-4" />
+            Share brief
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Share this brief</DialogTitle>
+          <DialogDescription>
+            Create a private, read-only link to the product brief. Anyone with
+            the link can view it — it isn&apos;t listed or searchable.
+          </DialogDescription>
+        </DialogHeader>
+
+        {token ? (
+          <div className="space-y-3 py-2">
+            <div className="rounded-lg border bg-muted/40 p-3">
+              <div className="text-xs font-medium text-muted-foreground">
+                Read-only brief link
+              </div>
+              <div className="truncate font-mono text-sm">{url}</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={copy}>
+                {copied ? <Check className="size-4 text-success" /> : <LinkIcon className="size-4" />}
+                {copied ? "Copied" : "Copy link"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => act("rotate")} disabled={working}>
+                {working ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                Rotate
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => act("disable")}
+                disabled={working}
+              >
+                Disable sharing
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="py-2">
+            <Button onClick={() => act("enable")} disabled={working}>
+              {working ? <Loader2 className="size-4 animate-spin" /> : <Share2 className="size-4" />}
+              Create share link
+            </Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Shared bits
 // ---------------------------------------------------------------------------
 
@@ -840,23 +970,4 @@ function sanitizeDraft(section: BriefSection, draft: unknown): unknown {
     default:
       return draft
   }
-}
-
-function Prose({ text }: { text: string }) {
-  return <p className="text-sm whitespace-pre-wrap">{text || "—"}</p>
-}
-
-function Empty() {
-  return <p className="text-sm text-muted-foreground">—</p>
-}
-
-function BulletList({ items, className }: { items: string[]; className?: string }) {
-  if (!items || items.length === 0) return <Empty />
-  return (
-    <ul className={`list-disc space-y-1.5 pl-5 text-sm ${className ?? ""}`}>
-      {items.map((item, i) => (
-        <li key={i}>{item}</li>
-      ))}
-    </ul>
-  )
 }

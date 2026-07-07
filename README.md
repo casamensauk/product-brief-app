@@ -18,6 +18,13 @@ Turn client discovery questionnaires into structured product briefs.
    section by section. Every section is then editable by hand or
    regenerable individually, earlier versions are snapshotted automatically
    and restorable, and the whole brief exports as Markdown.
+4. **Close the loop and share.** Turn the brief's open questions into a
+   follow-up round that reopens the client's questionnaire, and publish a
+   private read-only brief link (printable to PDF). Brand the client-facing
+   pages with your agency name and logo in Settings.
+
+Light and dark themes are supported (toggle in the user menu; follows the
+system preference by default).
 
 ## Stack
 

@@ -55,6 +55,7 @@ export type BriefData = {
   projectName: string | null
   contactEmail: string | null
   shareToken: string
+  briefShareToken: string | null
   status: BriefStatus
   questions: Question[]
   answers: Answers

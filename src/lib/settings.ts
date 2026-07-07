@@ -2,18 +2,28 @@ import { prisma } from "@/lib/prisma"
 
 export const DEFAULT_AGENCY_NAME = "Discovery Pro"
 
-/**
- * Agency display name for emails and client-facing pages. Reads the singleton
- * WorkspaceSettings row (managed in WP10); falls back to the default.
- */
-export async function getAgencyName(): Promise<string> {
+export type WorkspaceSettingsData = {
+  agencyName: string
+  logoUrl: string | null
+}
+
+/** Full workspace branding settings, with defaults when unset. */
+export async function getSettings(): Promise<WorkspaceSettingsData> {
   try {
     const settings = await prisma.workspaceSettings.findUnique({
       where: { id: "default" },
-      select: { agencyName: true },
+      select: { agencyName: true, logoUrl: true },
     })
-    return settings?.agencyName || DEFAULT_AGENCY_NAME
+    return {
+      agencyName: settings?.agencyName || DEFAULT_AGENCY_NAME,
+      logoUrl: settings?.logoUrl ?? null,
+    }
   } catch {
-    return DEFAULT_AGENCY_NAME
+    return { agencyName: DEFAULT_AGENCY_NAME, logoUrl: null }
   }
+}
+
+/** Agency display name for emails. */
+export async function getAgencyName(): Promise<string> {
+  return (await getSettings()).agencyName
 }

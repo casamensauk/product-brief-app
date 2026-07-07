@@ -39,20 +39,22 @@ export type AttachmentMeta = {
 // Steps: 0 = intro, 1..N = questions, N+1 = review
 export function ClientQuestionnaire({
   token,
-  clientName,
   projectName,
   questions,
   initialAnswers,
   alreadySubmitted,
   initialAttachments,
+  agencyName,
+  logoUrl,
 }: {
   token: string
-  clientName: string
   projectName: string | null
   questions: Question[]
   initialAnswers: Answers
   alreadySubmitted: boolean
   initialAttachments: AttachmentMeta[]
+  agencyName: string
+  logoUrl: string | null
 }) {
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<Answers>(initialAnswers)
@@ -121,6 +123,13 @@ export function ClientQuestionnaire({
     [questions, isAnswered]
   )
 
+  // Returning clients (e.g. after follow-up questions were added) land on the
+  // first unanswered question rather than re-reading answers they've given.
+  const resumeStep = useMemo(() => {
+    const idx = questions.findIndex((q) => !isAnswered(q))
+    return idx === -1 ? totalSteps + 1 : idx + 1
+  }, [questions, isAnswered, totalSteps])
+
   const goNext = () => {
     if (currentQuestion?.required && !isAnswered(currentQuestion)) {
       setValidationError("This question is required.")
@@ -156,7 +165,7 @@ export function ClientQuestionnaire({
 
   if (submitted) {
     return (
-      <Shell projectName={projectName} clientName={clientName}>
+      <Shell agencyName={agencyName} logoUrl={logoUrl}>
         <div className="flex flex-col items-center gap-4 rounded-xl border bg-card px-6 py-16 text-center shadow-sm">
           <CheckCircle2 className="size-12 text-success" />
           <h1 className="font-heading text-2xl font-bold">Thank you!</h1>
@@ -171,7 +180,7 @@ export function ClientQuestionnaire({
 
   if (step === 0) {
     return (
-      <Shell projectName={projectName} clientName={clientName}>
+      <Shell agencyName={agencyName} logoUrl={logoUrl}>
         <div className="rounded-xl border bg-card p-8 shadow-sm sm:p-10">
           <h1 className="font-heading text-2xl font-bold sm:text-3xl">
             {projectName ? `Let's plan ${projectName}` : "Let's plan your project"}
@@ -195,7 +204,7 @@ export function ClientQuestionnaire({
               There are no wrong answers — plain language is perfect
             </li>
           </ul>
-          <Button size="lg" className="mt-8" onClick={() => setStep(1)}>
+          <Button size="lg" className="mt-8" onClick={() => setStep(resumeStep)}>
             {answeredCount > 0 ? "Continue" : "Get started"}
             <ArrowRight className="size-4" />
           </Button>
@@ -206,7 +215,7 @@ export function ClientQuestionnaire({
 
   if (step > totalSteps) {
     return (
-      <Shell projectName={projectName} clientName={clientName}>
+      <Shell agencyName={agencyName} logoUrl={logoUrl}>
         <div className="space-y-4">
           <div className="rounded-xl border bg-card p-6 shadow-sm">
             <h1 className="font-heading text-xl font-bold">Review your answers</h1>
@@ -275,7 +284,7 @@ export function ClientQuestionnaire({
   const progress = Math.round(((step - 1) / totalSteps) * 100)
 
   return (
-    <Shell projectName={projectName} clientName={clientName} saveState={saveState}>
+    <Shell agencyName={agencyName} logoUrl={logoUrl} saveState={saveState}>
       <div className="mb-6">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
@@ -330,13 +339,13 @@ export function ClientQuestionnaire({
 }
 
 function Shell({
-  projectName,
-  clientName,
+  agencyName,
+  logoUrl,
   saveState,
   children,
 }: {
-  projectName: string | null
-  clientName: string
+  agencyName: string
+  logoUrl: string | null
   saveState?: SaveState
   children: React.ReactNode
 }) {
@@ -345,10 +354,13 @@ function Shell({
       <header className="border-b bg-card">
         <div className="mx-auto flex h-14 w-full max-w-2xl items-center justify-between px-4">
           <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
-            <FileText className="size-4 shrink-0 text-primary" />
-            <span className="truncate">
-              {projectName || clientName} — Discovery questionnaire
-            </span>
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- arbitrary white-label logo host
+              <img src={logoUrl} alt={agencyName} className="size-5 shrink-0 rounded object-contain" />
+            ) : (
+              <FileText className="size-4 shrink-0 text-primary" />
+            )}
+            <span className="truncate">{agencyName}</span>
           </span>
           {saveState && saveState !== "idle" && (
             <span
