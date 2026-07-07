@@ -20,10 +20,14 @@ const THEMES = [
   { value: "system", label: "System", icon: Monitor },
 ] as const
 
+// Stable subscribe reference so useSyncExternalStore doesn't re-subscribe
+// on every render.
+const emptySubscribe = () => () => {}
+
 // false during SSR / first render, true after hydration — no setState needed.
 function useMounted() {
   return useSyncExternalStore(
-    () => () => {},
+    emptySubscribe,
     () => true,
     () => false
   )

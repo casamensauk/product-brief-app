@@ -20,11 +20,6 @@ export function useShareUrl(token: string): string {
   return `${useOrigin()}/q/${token}`
 }
 
-/** Absolute URL of the public read-only brief share page. */
-export function briefShareUrl(token: string): string {
-  return `${window.location.origin}/brief/${token}`
-}
-
 export function shareUrl(token: string): string {
   return `${window.location.origin}/q/${token}`
 }

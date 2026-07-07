@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
 import { requireSession } from "@/lib/session"
-import { notFound, parseBody, unauthorized } from "@/lib/api"
+import { jsonError, notFound, parseBody, unauthorized } from "@/lib/api"
 import { followUpSchema, type Question } from "@/lib/schemas"
 import { parseQuestions } from "@/lib/answers"
 import {
@@ -25,6 +25,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!brief) return notFound()
 
   const existing = parseQuestions(brief.questions)
+  // questionsSchema caps questionnaires at 50; keep the combined set valid so
+  // later reads don't fail validation and fall back to the default template.
+  if (existing.length + data.questions.length > 50) {
+    return jsonError("That would push the questionnaire past its 50-question limit.", 400)
+  }
+
   const followUps: Question[] = data.questions.map((label) => ({
     id: randomUUID(),
     label,
@@ -43,22 +49,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     },
   })
 
+  // The brief is already saved; a failing email must not fail the request
+  // (a retry would append duplicate questions).
   let emailed = false
   if (brief.contactEmail && emailConfigured()) {
-    const agencyName = await getAgencyName()
-    const email = followUpEmail({
-      agencyName,
-      projectName: brief.projectName,
-      clientName: brief.clientName,
-      url: appUrl(`/q/${brief.shareToken}`),
-    })
-    const result = await sendEmail({
-      to: brief.contactEmail,
-      subject: email.subject,
-      html: email.html,
-      text: email.text,
-    })
-    emailed = result.sent
+    try {
+      const agencyName = await getAgencyName()
+      const email = followUpEmail({
+        agencyName,
+        projectName: brief.projectName,
+        clientName: brief.clientName,
+        url: appUrl(`/q/${brief.shareToken}`),
+      })
+      const result = await sendEmail({
+        to: brief.contactEmail,
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+      })
+      emailed = result.sent
+    } catch (err) {
+      console.error("[follow-up] email failed:", err)
+    }
   }
 
   return NextResponse.json({ ...updated, emailed })

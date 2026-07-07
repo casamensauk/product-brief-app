@@ -26,7 +26,7 @@ import {
   type BriefSectionKey,
 } from "@/lib/brief-sections"
 import { runBriefGeneration } from "@/lib/brief-stream-client"
-import { briefShareUrl, useOrigin } from "@/lib/share"
+import { useOrigin } from "@/lib/share"
 import { SectionReadView } from "@/components/brief-read-view"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -832,7 +832,7 @@ function ShareBriefDialog({
   }
 
   const copy = async () => {
-    await navigator.clipboard.writeText(briefShareUrl(token!))
+    await navigator.clipboard.writeText(url)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
