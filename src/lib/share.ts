@@ -2,18 +2,22 @@ import { useSyncExternalStore } from "react"
 
 const emptySubscribe = () => () => {}
 
+/** Origin resolved after hydration (empty on the server) — SSR-safe. */
+export function useOrigin(): string {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => window.location.origin,
+    () => ""
+  )
+}
+
 /**
  * Absolute URL a client uses to open the questionnaire. The server render
  * (and first client render) shows the path only; the origin appears once
  * hydrated — SSR-safe with no hydration mismatch.
  */
 export function useShareUrl(token: string): string {
-  const origin = useSyncExternalStore(
-    emptySubscribe,
-    () => window.location.origin,
-    () => ""
-  )
-  return `${origin}/q/${token}`
+  return `${useOrigin()}/q/${token}`
 }
 
 export function shareUrl(token: string): string {

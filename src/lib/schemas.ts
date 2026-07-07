@@ -79,6 +79,21 @@ export const createTemplateSchema = z.object({
   questions: questionsSchema,
 })
 
+export const followUpSchema = z.object({
+  questions: z.array(z.string().trim().min(1).max(500)).min(1).max(10),
+})
+
+export const shareBriefSchema = z.object({
+  action: z.enum(["enable", "rotate", "disable"]),
+})
+
+export const updateSettingsSchema = z.object({
+  agencyName: z.string().trim().min(1, "Agency name is required").max(200),
+  logoUrl: z
+    .union([z.literal(""), z.url().max(2000).startsWith("https://", "Use an https:// URL")])
+    .optional(),
+})
+
 // ---------------------------------------------------------------------------
 // AI-generated product brief
 // ---------------------------------------------------------------------------

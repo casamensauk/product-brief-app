@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { BriefsList, type BriefListItem } from "@/components/briefs-list"
 
 export const dynamic = "force-dynamic"
+export const metadata = { title: "Dashboard" }
 
 export default async function DashboardPage() {
   const briefs = await prisma.projectBrief.findMany({

@@ -34,6 +34,7 @@ export default async function BriefPage({
     projectName: brief.projectName,
     contactEmail: brief.contactEmail,
     shareToken: brief.shareToken,
+    briefShareToken: brief.briefShareToken,
     status: brief.status,
     questions: parseQuestions(brief.questions),
     answers: answersResult.success ? answersResult.data : {},

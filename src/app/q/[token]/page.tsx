@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { answersSchema } from "@/lib/schemas"
 import { parseQuestions } from "@/lib/answers"
+import { getSettings } from "@/lib/settings"
 import { ClientQuestionnaire } from "@/components/client-questionnaire"
 
 export const dynamic = "force-dynamic"
@@ -39,16 +40,18 @@ export default async function QuestionnairePage({
   if (questions.length === 0) notFound()
 
   const answersResult = answersSchema.safeParse(brief.rawClientAnswers)
+  const settings = await getSettings()
 
   return (
     <ClientQuestionnaire
       token={token}
-      clientName={brief.clientName}
       projectName={brief.projectName}
       questions={questions}
       initialAnswers={answersResult.success ? answersResult.data : {}}
       alreadySubmitted={brief.status !== "DRAFT"}
       initialAttachments={brief.attachments}
+      agencyName={settings.agencyName}
+      logoUrl={settings.logoUrl}
     />
   )
 }
