@@ -146,7 +146,7 @@ export const clientLinkSchema = z.object({
   url: z
     .url()
     .max(2000)
-    .regex(/^https?:\/\//, "Links must start with http(s)://"),
+    .regex(/^https?:\/\//i, "Links must start with http(s)://"),
   label: z.string().trim().max(200).optional(),
 })
 

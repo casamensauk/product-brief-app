@@ -130,7 +130,7 @@ export function CreateBriefDialog({ trigger }: { trigger?: React.ReactElement })
           <div className="grid gap-2">
             <Label>How should the client be interviewed?</Label>
             <RadioGroup value={mode} onValueChange={(v) => setMode(v as BriefMode)}>
-              <Label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 font-normal transition-colors has-data-[checked]:border-primary has-data-[checked]:bg-primary/5 hover:bg-muted/50">
+              <Label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 font-normal transition-colors has-data-checked:border-primary has-data-checked:bg-primary/5 hover:bg-muted/50">
                 <RadioGroupItem value="STATIC" className="mt-1" />
                 <span className="text-sm">
                   <span className="font-medium">Fixed questionnaire</span>
@@ -140,7 +140,7 @@ export function CreateBriefDialog({ trigger }: { trigger?: React.ReactElement })
                   </span>
                 </span>
               </Label>
-              <Label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 font-normal transition-colors has-data-[checked]:border-primary has-data-[checked]:bg-primary/5 hover:bg-muted/50">
+              <Label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 font-normal transition-colors has-data-checked:border-primary has-data-checked:bg-primary/5 hover:bg-muted/50">
                 <RadioGroupItem value="ADAPTIVE" className="mt-1" />
                 <span className="text-sm">
                   <span className="font-medium">AI-guided interview</span>

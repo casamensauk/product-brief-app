@@ -572,7 +572,7 @@ function QuestionInput({
           {(question.options ?? []).map((option) => (
             <Label
               key={option}
-              className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 font-normal transition-colors has-data-[checked]:border-primary has-data-[checked]:bg-primary/5 hover:bg-muted/50"
+              className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 font-normal transition-colors has-data-checked:border-primary has-data-checked:bg-primary/5 hover:bg-muted/50"
             >
               <RadioGroupItem value={option} />
               {option}
@@ -717,6 +717,12 @@ function AttachmentsUpload({
       setLinkError("Links must start with http:// or https://")
       return
     }
+    try {
+      new URL(url)
+    } catch {
+      setLinkError("That doesn't look like a valid web address.")
+      return
+    }
     if (links.length >= MAX_CLIENT_LINKS) {
       setLinkError(`You can add up to ${MAX_CLIENT_LINKS} links.`)
       return
@@ -825,6 +831,7 @@ function AttachmentsUpload({
                   size="icon-sm"
                   aria-label={`Remove link ${link.label || link.url}`}
                   onClick={() => handleRemoveLink(i)}
+                  disabled={savingLink}
                 >
                   <X className="size-4" />
                 </Button>
@@ -855,6 +862,7 @@ function AttachmentsUpload({
               }}
               placeholder="https://example.com/brand-guidelines"
               aria-label="Link URL"
+              disabled={savingLink}
             />
             <Button
               type="button"
