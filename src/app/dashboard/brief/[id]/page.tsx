@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
-import { answersSchema, productBriefSchema } from "@/lib/schemas"
+import { answersSchema, clientLinksSchema, productBriefSchema } from "@/lib/schemas"
 import { parseQuestions } from "@/lib/answers"
 import { emailConfigured } from "@/lib/email"
 import { BriefWorkspace, type BriefData } from "@/components/brief-workspace"
@@ -27,6 +27,7 @@ export default async function BriefPage({
 
   const answersResult = answersSchema.safeParse(brief.rawClientAnswers)
   const briefResult = productBriefSchema.safeParse(brief.generatedBrief)
+  const clientLinksResult = clientLinksSchema.safeParse(brief.clientLinks)
 
   const data: BriefData = {
     id: brief.id,
@@ -36,6 +37,8 @@ export default async function BriefPage({
     shareToken: brief.shareToken,
     briefShareToken: brief.briefShareToken,
     status: brief.status,
+    mode: brief.mode,
+    clientLinks: clientLinksResult.success ? clientLinksResult.data : [],
     questions: parseQuestions(brief.questions),
     answers: answersResult.success ? answersResult.data : {},
     generatedBrief: brief.generatedBrief ? (briefResult.success ? briefResult.data : null) : null,

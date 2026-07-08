@@ -10,11 +10,12 @@ import {
   Mail,
   Pencil,
   RefreshCw,
+  Sparkles,
   Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
 import type { BriefStatus } from "@prisma/client"
-import type { Answers, ProductBrief, Question } from "@/lib/schemas"
+import type { Answers, ClientLink, ProductBrief, Question } from "@/lib/schemas"
 import { copyShareLink, useShareUrl } from "@/lib/share"
 import { ALL_STATUSES, STATUS_BADGE_VARIANTS, STATUS_LABELS } from "@/lib/status"
 import { Badge } from "@/components/ui/badge"
@@ -57,6 +58,8 @@ export type BriefData = {
   shareToken: string
   briefShareToken: string | null
   status: BriefStatus
+  mode: "STATIC" | "ADAPTIVE"
+  clientLinks: ClientLink[]
   questions: Question[]
   answers: Answers
   generatedBrief: ProductBrief | null
@@ -199,6 +202,12 @@ export function BriefWorkspace({
             <Badge variant={STATUS_BADGE_VARIANTS[brief.status]}>
               {STATUS_LABELS[brief.status]}
             </Badge>
+            {brief.mode === "ADAPTIVE" && (
+              <Badge variant="secondary">
+                <Sparkles className="size-3" />
+                AI interview
+              </Badge>
+            )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {brief.clientName}
@@ -329,24 +338,69 @@ export function BriefWorkspace({
         ))}
       </div>
 
-      {tab === "questionnaire" && (
-        <QuestionnaireBuilder
-          briefId={brief.id}
-          initialQuestions={brief.questions}
-          locked={brief.status !== "DRAFT"}
-          onSave={async (questions) => {
-            const ok = await patchBrief({ questions })
-            if (ok) toast.success("Questionnaire saved")
-            return ok
-          }}
-        />
-      )}
+      {tab === "questionnaire" &&
+        (brief.mode === "ADAPTIVE" ? (
+          <AdaptiveQuestionsList questions={brief.questions} />
+        ) : (
+          <QuestionnaireBuilder
+            briefId={brief.id}
+            initialQuestions={brief.questions}
+            locked={brief.status !== "DRAFT"}
+            onSave={async (questions) => {
+              const ok = await patchBrief({ questions })
+              if (ok) toast.success("Questionnaire saved")
+              return ok
+            }}
+          />
+        ))}
       {tab === "responses" && (
         <ResponsesView brief={brief} onCopyLink={handleCopy} />
       )}
       {tab === "brief" && (
         <ProductBriefView brief={brief} onGenerated={(updated) => setBrief(updated)} />
       )}
+    </div>
+  )
+}
+
+const QUESTION_TYPE_LABELS: Record<Question["type"], string> = {
+  short_text: "Short text",
+  long_text: "Long text",
+  single_select: "Single choice",
+  multi_select: "Multiple choice",
+}
+
+function AdaptiveQuestionsList({ questions }: { questions: Question[] }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 rounded-xl border bg-muted/50 p-4 text-sm text-muted-foreground">
+        <Sparkles className="size-4 shrink-0" />
+        AI-guided interview — questions are generated one at a time as the
+        client answers. The list below grows as the interview progresses.
+      </div>
+      <div className="space-y-3">
+        {questions.map((q, i) => (
+          <div key={q.id} className="rounded-xl border bg-card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="text-xs font-medium text-muted-foreground">
+                  Question {i + 1} · {QUESTION_TYPE_LABELS[q.type]}
+                  {q.required ? " · Required" : ""}
+                </span>
+                <p className="mt-1 font-medium">{q.label}</p>
+                {q.helpText && (
+                  <p className="mt-1 text-sm text-muted-foreground">{q.helpText}</p>
+                )}
+                {q.options && q.options.length > 0 && (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Options: {q.options.join(", ")}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

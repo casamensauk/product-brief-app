@@ -63,6 +63,7 @@ export function parseModelJson(content: string): unknown {
 export async function completeJson(options: {
   system: string
   prompt: string
+  model?: string
 }): Promise<unknown> {
   const apiKey = requireApiKey()
 
@@ -76,7 +77,7 @@ export async function completeJson(options: {
         "X-Title": "Product Brief App",
       },
       body: JSON.stringify({
-        model: process.env.OPENROUTER_MODEL || DEFAULT_MODEL,
+        model: options.model || process.env.OPENROUTER_MODEL || DEFAULT_MODEL,
         messages: [
           { role: "system", content: options.system },
           { role: "user", content: options.prompt },
@@ -113,6 +114,7 @@ export async function streamCompletion(options: {
   onDelta: (text: string) => void
   /** Cancels the upstream request early (e.g. when the client disconnects). */
   signal?: AbortSignal
+  model?: string
 }): Promise<string> {
   const apiKey = requireApiKey()
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
@@ -128,7 +130,7 @@ export async function streamCompletion(options: {
         "X-Title": "Product Brief App",
       },
       body: JSON.stringify({
-        model: process.env.OPENROUTER_MODEL || DEFAULT_MODEL,
+        model: options.model || process.env.OPENROUTER_MODEL || DEFAULT_MODEL,
         messages: [
           { role: "system", content: options.system },
           { role: "user", content: options.prompt },

@@ -7,7 +7,9 @@ Turn client discovery questionnaires into structured product briefs.
 1. **Create a discovery session** for a client/project. It starts with a proven
    default questionnaire you can edit, let AI draft one tailored to the
    project, or start from a saved template (Settings → Questionnaire
-   templates).
+   templates) — or flip on the AI-guided interview, where the AI asks one
+   question at a time and adapts to each answer (clients can also attach
+   files and share links).
 2. **Share one link** with the client. They answer step by step on any device,
    answers autosave, required questions are enforced, and they can attach
    supporting files (logos, sketches, PDFs). No client account needed.
@@ -53,6 +55,7 @@ npm run dev
 | `BETTER_AUTH_URL` | yes | Canonical app URL (`http://localhost:3000` in dev) |
 | `OPENROUTER_API_KEY` | for AI | Key from [openrouter.ai/keys](https://openrouter.ai/keys). Without it the app works, but AI features return a clear error |
 | `OPENROUTER_MODEL` | no | Defaults to `anthropic/claude-sonnet-4.5` |
+| `OPENROUTER_INTERVIEW_MODEL` | no | Model for picking the next interview question. Defaults to `OPENROUTER_MODEL` |
 | `RESEND_API_KEY` | for email | Key from [resend.com](https://resend.com). Without it, email actions report a clear "not configured" state instead of sending |
 | `EMAIL_FROM` | for email | Verified sender, e.g. `Discovery Pro <onboarding@resend.dev>` |
 | `ALLOW_SIGNUP` | no | Set to `"false"` to close public sign-up (existing users can still sign in). Defaults to open |
@@ -94,6 +97,9 @@ npm test          # unit tests always run; integration runs if TEST_DATABASE_URL
   a per-instance limiter in `src/lib/rate-limit.ts` (answers 30/min, submit
   5/min per IP+token). Both are in-memory — a multi-instance deployment would
   need shared storage.
+- The public next-question endpoint (AI-guided interview) is rate-limited
+  (5/min per IP+token) and each interview is capped at 15 questions, bounding
+  AI spend per brief.
 - Server errors are logged as structured JSON via `src/instrumentation.ts`
   (`onRequestError`), where a provider like Sentry can be wired in later.
 - Client-uploaded attachments are stored as bytes directly in Postgres (no

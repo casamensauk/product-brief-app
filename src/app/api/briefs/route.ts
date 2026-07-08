@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/session"
 import { jsonError, parseBody, unauthorized } from "@/lib/api"
 import { createBriefSchema, questionsSchema, type Question } from "@/lib/schemas"
 import { DEFAULT_QUESTIONS } from "@/lib/templates"
+import { seedQuestion } from "@/lib/interview"
 
 export async function GET(req: Request) {
   if (!(await requireSession(req))) return unauthorized()
@@ -34,8 +35,14 @@ export async function POST(req: Request) {
   const { data, error } = await parseBody(req, createBriefSchema)
   if (error) return error
 
+  const mode = data.mode || "STATIC"
+
   let questions: Question[] = DEFAULT_QUESTIONS
-  if (data.templateId && data.templateId !== "default") {
+  if (mode === "ADAPTIVE") {
+    // The AI picks every question after the seed one — a template would
+    // never be seen, so don't bother looking it up.
+    questions = [seedQuestion()]
+  } else if (data.templateId && data.templateId !== "default") {
     const template = await prisma.questionnaireTemplate.findUnique({
       where: { id: data.templateId },
       select: { questions: true },
@@ -54,6 +61,7 @@ export async function POST(req: Request) {
       contactEmail: data.contactEmail || null,
       shareToken: randomBytes(24).toString("base64url"),
       status: "DRAFT",
+      mode,
       questions,
       ownerId: session.user.id,
     },

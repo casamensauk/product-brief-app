@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { requireSession } from "@/lib/session"
 import { jsonError, notFound, unauthorized } from "@/lib/api"
 import { AIError, parseModelJson, streamCompletion } from "@/lib/ai"
-import { answersSchema, productBriefSchema } from "@/lib/schemas"
+import { answersSchema, clientLinksSchema, productBriefSchema } from "@/lib/schemas"
 import { parseQuestions } from "@/lib/answers"
 import { detectNewSections } from "@/lib/stream"
 import { BRIEF_SYSTEM_PROMPT, answeredContext, buildFullBriefPrompt } from "@/lib/brief-prompt"
@@ -33,10 +33,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return jsonError("The client has not answered the questionnaire yet.", 400)
   }
 
+  // Append client reference links to the Q&A context — appending (rather
+  // than splicing into the prompt template) can't silently break if the
+  // template wording changes.
+  const linksResult = clientLinksSchema.safeParse(brief.clientLinks)
+  const contextWithLinks =
+    linksResult.success && linksResult.data.length > 0
+      ? `${context}\n\nReference links provided by the client (you cannot open them; treat the URLs/labels as context):\n${linksResult.data
+          .map((link) => `- ${link.label || link.url}: ${link.url}`)
+          .join("\n")}`
+      : context
+
   const prompt = buildFullBriefPrompt({
     clientName: brief.clientName,
     projectName: brief.projectName,
-    context,
+    context: contextWithLinks,
   })
 
   const encoder = new TextEncoder()

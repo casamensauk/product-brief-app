@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
-import { answersSchema } from "@/lib/schemas"
+import { answersSchema, clientLinksSchema } from "@/lib/schemas"
 import { parseQuestions } from "@/lib/answers"
 import { getSettings } from "@/lib/settings"
 import { ClientQuestionnaire } from "@/components/client-questionnaire"
@@ -28,6 +28,8 @@ export default async function QuestionnairePage({
       status: true,
       questions: true,
       rawClientAnswers: true,
+      mode: true,
+      clientLinks: true,
       attachments: {
         select: { id: true, filename: true, mimeType: true, size: true },
         orderBy: { createdAt: "asc" },
@@ -40,6 +42,7 @@ export default async function QuestionnairePage({
   if (questions.length === 0) notFound()
 
   const answersResult = answersSchema.safeParse(brief.rawClientAnswers)
+  const linksResult = clientLinksSchema.safeParse(brief.clientLinks)
   const settings = await getSettings()
 
   return (
@@ -52,6 +55,8 @@ export default async function QuestionnairePage({
       initialAttachments={brief.attachments}
       agencyName={settings.agencyName}
       logoUrl={settings.logoUrl}
+      mode={brief.mode}
+      initialLinks={linksResult.success ? linksResult.data : []}
     />
   )
 }
