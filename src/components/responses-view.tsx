@@ -1,5 +1,5 @@
 "use client"
-import { Download, File as FileIcon, LinkIcon, MailQuestion } from "lucide-react"
+import { Download, ExternalLink, File as FileIcon, LinkIcon, MailQuestion } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { formatFileSize } from "@/lib/attachments"
@@ -92,6 +92,29 @@ export function ResponsesView({
                 >
                   <Download className="size-3.5" />
                   Download
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {brief.clientLinks.length > 0 && (
+        <div className="rounded-xl border bg-card p-4">
+          <h3 className="text-sm font-medium">
+            Shared links ({brief.clientLinks.length})
+          </h3>
+          <ul className="mt-2 space-y-2">
+            {brief.clientLinks.map((link, i) => (
+              <li key={`${i}-${link.url}`} className="flex items-center gap-2 text-sm">
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex min-w-0 items-center gap-2 text-primary hover:underline"
+                >
+                  <ExternalLink className="size-4 shrink-0" />
+                  <span className="truncate">{link.label || link.url}</span>
                 </a>
               </li>
             ))}

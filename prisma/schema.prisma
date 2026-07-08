@@ -13,6 +13,13 @@ enum BriefStatus {
   SCOPED
 }
 
+// How the client questionnaire is driven: a fixed list of questions, or an
+// AI-guided interview that picks each next question from the answers so far.
+enum BriefMode {
+  STATIC
+  ADAPTIVE
+}
+
 model ProjectBrief {
   id           String      @id @default(uuid())
   clientName   String
@@ -20,6 +27,10 @@ model ProjectBrief {
   contactEmail String?
   shareToken   String      @unique
   status       BriefStatus @default(DRAFT)
+  mode         BriefMode   @default(STATIC)
+
+  // Reference links added by the client (array of {url, label?}, capped)
+  clientLinks Json?
 
   // Creator of the session. Nullable so briefs survive a user being deleted.
   ownerId String?

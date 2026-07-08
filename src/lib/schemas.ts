@@ -51,6 +51,12 @@ export type Answers = z.infer<typeof answersSchema>
 // Brief metadata (dashboard-editable fields)
 // ---------------------------------------------------------------------------
 
+/**
+ * How the client questionnaire is driven: a fixed list of questions, or an
+ * AI-guided interview that picks each next question from the answers so far.
+ */
+export const briefModeSchema = z.enum(["STATIC", "ADAPTIVE"])
+
 export const createBriefSchema = z.object({
   clientName: z.string().trim().min(1, "Client name is required").max(200),
   projectName: z.string().trim().max(200).optional(),
@@ -60,6 +66,7 @@ export const createBriefSchema = z.object({
   // Id of a saved QuestionnaireTemplate to seed the questions from. Omitted
   // (or "default") uses the built-in default questionnaire.
   templateId: z.string().min(1).optional(),
+  mode: briefModeSchema.optional(),
 })
 
 export const updateBriefSchema = z.object({
@@ -130,3 +137,19 @@ export const productBriefSchema = z.object({
 })
 
 export type ProductBrief = z.infer<typeof productBriefSchema>
+
+// ---------------------------------------------------------------------------
+// Client-supplied reference links (adaptive interview)
+// ---------------------------------------------------------------------------
+
+export const clientLinkSchema = z.object({
+  url: z
+    .url()
+    .max(2000)
+    .regex(/^https?:\/\//, "Links must start with http(s)://"),
+  label: z.string().trim().max(200).optional(),
+})
+
+export const clientLinksSchema = z.array(clientLinkSchema).max(10)
+
+export type ClientLink = z.infer<typeof clientLinkSchema>

@@ -7,13 +7,15 @@ import {
   CheckCircle2,
   File as FileIcon,
   FileText,
+  Link as LinkIcon,
   Loader2,
   Paperclip,
   Pencil,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
-import type { Answers, Question } from "@/lib/schemas"
+import type { Answers, ClientLink, Question } from "@/lib/schemas"
+import { COVERAGE_AREAS } from "@/lib/interview"
 import {
   ACCEPT_ATTR,
   MAX_ATTACHMENTS_PER_BRIEF,
@@ -29,6 +31,9 @@ import { Textarea } from "@/components/ui/textarea"
 
 type SaveState = "idle" | "saving" | "saved" | "error"
 
+// Mirrors the server cap in clientLinksSchema (src/lib/schemas.ts).
+const MAX_CLIENT_LINKS = 10
+
 export type AttachmentMeta = {
   id: string
   filename: string
@@ -40,12 +45,14 @@ export type AttachmentMeta = {
 export function ClientQuestionnaire({
   token,
   projectName,
-  questions,
+  questions: initialQuestions,
   initialAnswers,
   alreadySubmitted,
   initialAttachments,
   agencyName,
   logoUrl,
+  mode,
+  initialLinks,
 }: {
   token: string
   projectName: string | null
@@ -55,14 +62,25 @@ export function ClientQuestionnaire({
   initialAttachments: AttachmentMeta[]
   agencyName: string
   logoUrl: string | null
+  mode: "STATIC" | "ADAPTIVE"
+  initialLinks: ClientLink[]
 }) {
   const [step, setStep] = useState(0)
+  // For STATIC briefs this never grows past the initial list. For ADAPTIVE
+  // briefs, next-question appends to it as the interview progresses.
+  const [questions, setQuestions] = useState<Question[]>(initialQuestions)
   const [answers, setAnswers] = useState<Answers>(initialAnswers)
   const [saveState, setSaveState] = useState<SaveState>("idle")
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(alreadySubmitted)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [attachments, setAttachments] = useState<AttachmentMeta[]>(initialAttachments)
+  const [links, setLinks] = useState<ClientLink[]>(initialLinks)
+
+  // Adaptive-interview-only state.
+  const [coveredAreas, setCoveredAreas] = useState<string[]>([])
+  const [interviewLoading, setInterviewLoading] = useState(false)
+  const [aiFailed, setAiFailed] = useState(false)
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveAbort = useRef<AbortController | null>(null)
@@ -130,13 +148,76 @@ export function ClientQuestionnaire({
     return idx === -1 ? totalSteps + 1 : idx + 1
   }, [questions, isAnswered, totalSteps])
 
-  const goNext = () => {
-    if (currentQuestion?.required && !isAnswered(currentQuestion)) {
+  // Asks the server for the next interview question (or the signal that the
+  // interview is done). The caller is responsible for having already flushed
+  // any pending answers save and for passing the up-to-date answers object,
+  // since React state updates made just before calling this aren't visible
+  // via the `answers` closure yet.
+  const fetchNextQuestion = useCallback(
+    async (answersToSend: Answers) => {
+      setInterviewLoading(true)
+      try {
+        const res = await fetch(`/api/public/briefs/${token}/next-question`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answers: answersToSend }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          throw new Error(data.error || "Couldn't get the next question. Please try again.")
+        }
+        setCoveredAreas(Array.isArray(data.coveredAreas) ? data.coveredAreas : [])
+        if (!data.done && data.question) {
+          setQuestions((prev) => [...prev, data.question as Question])
+        }
+        setStep((s) => s + 1)
+      } catch (err) {
+        setAiFailed(true)
+        toast.error(
+          err instanceof Error ? err.message : "Couldn't get the next question. Please try again."
+        )
+      } finally {
+        setInterviewLoading(false)
+      }
+    },
+    [token]
+  )
+
+  const handleNext = async (skip: boolean) => {
+    if (!currentQuestion) return
+
+    let effectiveAnswers = answers
+    if (skip) {
+      effectiveAnswers = { ...answers, [currentQuestion.id]: "" }
+      setAnswers(effectiveAnswers)
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(() => save(effectiveAnswers), 800)
+    } else if (currentQuestion.required && !isAnswered(currentQuestion)) {
       setValidationError("This question is required.")
       return
     }
     setValidationError(null)
+
+    const isLastQuestion = step === totalSteps
+    if (mode === "ADAPTIVE" && isLastQuestion) {
+      // Flush the pending debounced save — next-question persists the
+      // answers we send it directly, so there's no need for the older
+      // timer to also fire (and it would just be redundant).
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current)
+        saveTimer.current = null
+      }
+      setAiFailed(false)
+      await fetchNextQuestion(effectiveAnswers)
+      return
+    }
+
     setStep((s) => Math.min(s + 1, totalSteps + 1))
+  }
+
+  const handleContinueToReviewInstead = () => {
+    setAiFailed(false)
+    setStep(totalSteps + 1)
   }
 
   const handleSubmit = async () => {
@@ -186,9 +267,20 @@ export function ClientQuestionnaire({
             {projectName ? `Let's plan ${projectName}` : "Let's plan your project"}
           </h1>
           <p className="mt-4 text-muted-foreground">
-            Before we start building, we&apos;d like to understand your goals.
-            This questionnaire has {questions.length} questions and takes about{" "}
-            {Math.max(5, Math.ceil(questions.length * 1.5))} minutes.
+            {mode === "ADAPTIVE" ? (
+              <>
+                This is a short AI-guided interview — answer one question at a
+                time and the next question adapts to your answers. Usually
+                8–15 questions.
+              </>
+            ) : (
+              <>
+                Before we start building, we&apos;d like to understand your
+                goals. This questionnaire has {questions.length} questions and
+                takes about {Math.max(5, Math.ceil(questions.length * 1.5))}{" "}
+                minutes.
+              </>
+            )}
           </p>
           <ul className="mt-6 space-y-2 text-sm text-muted-foreground">
             <li className="flex items-center gap-2">
@@ -201,7 +293,9 @@ export function ClientQuestionnaire({
             </li>
             <li className="flex items-center gap-2">
               <Check className="size-4 text-success" />
-              There are no wrong answers — plain language is perfect
+              {mode === "ADAPTIVE"
+                ? "You can add files and links at the end"
+                : "There are no wrong answers — plain language is perfect"}
             </li>
           </ul>
           <Button size="lg" className="mt-8" onClick={() => setStep(resumeStep)}>
@@ -263,6 +357,8 @@ export function ClientQuestionnaire({
             token={token}
             attachments={attachments}
             onAttachmentsChange={setAttachments}
+            links={links}
+            onLinksChange={setLinks}
           />
 
           <div className="flex items-center justify-between gap-3 pt-2">
@@ -281,29 +377,62 @@ export function ClientQuestionnaire({
   }
 
   const q = currentQuestion!
+  const isLastQuestion = step === totalSteps
   const progress = Math.round(((step - 1) / totalSteps) * 100)
+  const coveredCount = coveredAreas.length
+  const coverageProgress = Math.max((coveredCount / COVERAGE_AREAS.length) * 100, 4)
+  const nextLabel = interviewLoading
+    ? "Thinking…"
+    : mode === "STATIC" && isLastQuestion
+      ? "Review answers"
+      : "Next"
 
   return (
     <Shell agencyName={agencyName} logoUrl={logoUrl} saveState={saveState}>
       <div className="mb-6">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>
-            Question {step} of {totalSteps}
-          </span>
-          <span>{progress}% complete</span>
-        </div>
-        <div
-          role="progressbar"
-          aria-valuenow={progress}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
-        >
-          <div
-            className="h-full rounded-full bg-primary transition-all duration-300"
-            style={{ width: `${Math.max(progress, 2)}%` }}
-          />
-        </div>
+        {mode === "ADAPTIVE" ? (
+          <>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Question {step}</span>
+              <span>
+                topics covered: {coveredCount} of {COVERAGE_AREAS.length}
+              </span>
+            </div>
+            <div
+              role="progressbar"
+              aria-valuenow={coveredCount}
+              aria-valuemin={0}
+              aria-valuemax={COVERAGE_AREAS.length}
+              className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${coverageProgress}%` }}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                Question {step} of {totalSteps}
+              </span>
+              <span>{progress}% complete</span>
+            </div>
+            <div
+              role="progressbar"
+              aria-valuenow={progress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${Math.max(progress, 2)}%` }}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       <div className="rounded-xl border bg-card p-6 shadow-sm sm:p-8">
@@ -325,15 +454,38 @@ export function ClientQuestionnaire({
       </div>
 
       <div className="mt-6 flex items-center justify-between">
-        <Button variant="outline" onClick={() => setStep((s) => s - 1)}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setAiFailed(false)
+            setStep((s) => s - 1)
+          }}
+          disabled={interviewLoading}
+        >
           <ArrowLeft className="size-4" />
           Back
         </Button>
-        <Button onClick={goNext}>
-          {step === totalSteps ? "Review answers" : "Next"}
-          <ArrowRight className="size-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          {mode === "ADAPTIVE" && !q.required && (
+            <Button variant="outline" onClick={() => handleNext(true)} disabled={interviewLoading}>
+              Skip
+            </Button>
+          )}
+          <Button onClick={() => handleNext(false)} disabled={interviewLoading}>
+            {interviewLoading && <Loader2 className="size-4 animate-spin" />}
+            {nextLabel}
+            {!interviewLoading && <ArrowRight className="size-4" />}
+          </Button>
+        </div>
       </div>
+
+      {aiFailed && mode === "ADAPTIVE" && (
+        <div className="mt-3 flex justify-end">
+          <Button variant="ghost" size="sm" onClick={handleContinueToReviewInstead}>
+            Continue to review instead
+          </Button>
+        </div>
+      )}
     </Shell>
   )
 }
@@ -464,14 +616,22 @@ function AttachmentsUpload({
   token,
   attachments,
   onAttachmentsChange,
+  links,
+  onLinksChange,
 }: {
   token: string
   attachments: AttachmentMeta[]
   onAttachmentsChange: (next: AttachmentMeta[]) => void
+  links: ClientLink[]
+  onLinksChange: (next: ClientLink[]) => void
 }) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const [linkUrl, setLinkUrl] = useState("")
+  const [linkError, setLinkError] = useState<string | null>(null)
+  const [savingLink, setSavingLink] = useState(false)
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return
@@ -528,15 +688,65 @@ function AttachmentsUpload({
     }
   }
 
+  const persistLinks = async (
+    next: ClientLink[],
+    previous: ClientLink[],
+    failureMessage: string
+  ) => {
+    onLinksChange(next)
+    setSavingLink(true)
+    try {
+      const res = await fetch(`/api/public/briefs/${token}/links`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ links: next }),
+      })
+      if (!res.ok) throw new Error()
+    } catch {
+      onLinksChange(previous)
+      toast.error(failureMessage)
+    } finally {
+      setSavingLink(false)
+    }
+  }
+
+  const handleAddLink = () => {
+    const url = linkUrl.trim()
+    if (!url) return
+    if (!/^https?:\/\//i.test(url)) {
+      setLinkError("Links must start with http:// or https://")
+      return
+    }
+    if (links.length >= MAX_CLIENT_LINKS) {
+      setLinkError(`You can add up to ${MAX_CLIENT_LINKS} links.`)
+      return
+    }
+    setLinkError(null)
+    const previous = links
+    setLinkUrl("")
+    persistLinks([...previous, { url }], previous, "Failed to save the link. Please try again.")
+  }
+
+  const handleRemoveLink = (index: number) => {
+    setLinkError(null)
+    const previous = links
+    persistLinks(
+      previous.filter((_, i) => i !== index),
+      previous,
+      "Failed to remove the link. Please try again."
+    )
+  }
+
   return (
     <div className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="flex items-center gap-2">
         <Paperclip className="size-4 text-muted-foreground" />
-        <h2 className="text-sm font-medium">Add supporting files (optional)</h2>
+        <h2 className="text-sm font-medium">Add supporting files &amp; links (optional)</h2>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        Logos, sketches, or reference documents. Images or PDF, up to 5 MB each,{" "}
-        {MAX_ATTACHMENTS_PER_BRIEF} files max.
+        Logos, sketches, reference documents, or links to brand guidelines and
+        inspiration. Images or PDF, up to 5 MB each, {MAX_ATTACHMENTS_PER_BRIEF}{" "}
+        files max, {MAX_CLIENT_LINKS} links max.
       </p>
 
       {attachments.length > 0 && (
@@ -595,6 +805,70 @@ function AttachmentsUpload({
           </Button>
         </div>
       )}
+
+      <div className="mt-4 border-t pt-4">
+        <p className="text-xs font-medium text-muted-foreground">Links</p>
+
+        {links.length > 0 && (
+          <ul className="mt-2 space-y-2">
+            {links.map((link, i) => (
+              <li
+                key={`${i}-${link.url}`}
+                className="flex items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2 text-sm"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <LinkIcon className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{link.label || link.url}</span>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Remove link ${link.label || link.url}`}
+                  onClick={() => handleRemoveLink(i)}
+                >
+                  <X className="size-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {linkError && (
+          <p role="alert" className="mt-2 text-sm text-destructive">
+            {linkError}
+          </p>
+        )}
+
+        {links.length < MAX_CLIENT_LINKS && (
+          <div className="mt-3 flex items-center gap-2">
+            <Input
+              value={linkUrl}
+              onChange={(e) => {
+                setLinkUrl(e.target.value)
+                setLinkError(null)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  handleAddLink()
+                }
+              }}
+              placeholder="https://example.com/brand-guidelines"
+              aria-label="Link URL"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={savingLink || !linkUrl.trim()}
+              onClick={handleAddLink}
+            >
+              {savingLink && <Loader2 className="size-4 animate-spin" />}
+              Add link
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

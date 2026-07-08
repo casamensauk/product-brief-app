@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
   Select,
   SelectContent,
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/select"
 
 type TemplateOption = { id: string; name: string; questionCount: number }
+type BriefMode = "STATIC" | "ADAPTIVE"
 
 export function CreateBriefDialog({ trigger }: { trigger?: React.ReactElement }) {
   const router = useRouter()
@@ -32,6 +34,7 @@ export function CreateBriefDialog({ trigger }: { trigger?: React.ReactElement })
   const [clientName, setClientName] = useState("")
   const [projectName, setProjectName] = useState("")
   const [contactEmail, setContactEmail] = useState("")
+  const [mode, setMode] = useState<BriefMode>("STATIC")
   const [templateId, setTemplateId] = useState("default")
   const [templates, setTemplates] = useState<TemplateOption[]>([])
 
@@ -57,7 +60,7 @@ export function CreateBriefDialog({ trigger }: { trigger?: React.ReactElement })
       const res = await fetch("/api/briefs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientName, projectName, contactEmail, templateId }),
+        body: JSON.stringify({ clientName, projectName, contactEmail, templateId, mode }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to create the session")
@@ -125,21 +128,48 @@ export function CreateBriefDialog({ trigger }: { trigger?: React.ReactElement })
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="template">Questionnaire</Label>
-            <Select value={templateId} onValueChange={(v) => setTemplateId(v as string)} items={templateItems}>
-              <SelectTrigger id="template" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">Default questionnaire</SelectItem>
-                {templates.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.name} ({t.questionCount} questions)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>How should the client be interviewed?</Label>
+            <RadioGroup value={mode} onValueChange={(v) => setMode(v as BriefMode)}>
+              <Label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 font-normal transition-colors has-data-[checked]:border-primary has-data-[checked]:bg-primary/5 hover:bg-muted/50">
+                <RadioGroupItem value="STATIC" className="mt-1" />
+                <span className="text-sm">
+                  <span className="font-medium">Fixed questionnaire</span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    — Start from the default or a saved template and edit before sharing
+                  </span>
+                </span>
+              </Label>
+              <Label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 font-normal transition-colors has-data-[checked]:border-primary has-data-[checked]:bg-primary/5 hover:bg-muted/50">
+                <RadioGroupItem value="ADAPTIVE" className="mt-1" />
+                <span className="text-sm">
+                  <span className="font-medium">AI-guided interview</span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    — The AI asks one question at a time and adapts to the client&apos;s answers
+                  </span>
+                </span>
+              </Label>
+            </RadioGroup>
           </div>
+          {mode === "STATIC" && (
+            <div className="grid gap-2">
+              <Label htmlFor="template">Questionnaire</Label>
+              <Select value={templateId} onValueChange={(v) => setTemplateId(v as string)} items={templateItems}>
+                <SelectTrigger id="template" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Default questionnaire</SelectItem>
+                  {templates.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name} ({t.questionCount} questions)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </form>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={creating}>
